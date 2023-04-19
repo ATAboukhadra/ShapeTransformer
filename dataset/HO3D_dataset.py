@@ -104,7 +104,7 @@ class Dataset(data.Dataset):
         temporal_pose2d = pose2d.unsqueeze(0).repeat(T, 1, 1)
         temporal_boxes = boxes.unsqueeze(0).repeat(T, 1, 1)
         temporal_pose3d = pose3d.unsqueeze(0).repeat(T, 1, 1)
-
+        
         return temporal_images, temporal_pose2d, temporal_boxes, temporal_pose3d
 
     def causal_temporal_batch(self, index, T):
