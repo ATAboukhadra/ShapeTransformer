@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 import argparse
 import os
 import numpy as np
+import logging
+
 from nimble.utils import batch_to_tensor_device
 from nimble.NIMBLELayer import NIMBLELayer
 
@@ -90,3 +92,29 @@ def init_nimble():
 
     nlayer = NIMBLELayer(pm_dict, tex_dict, device, use_pose_pca=True, pose_ncomp=30, shape_ncomp=20, nimble_mano_vreg=nimble_mano_vreg)
     return nlayer
+
+
+def create_logger(dir):
+
+    # Create a logger object
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.DEBUG)
+
+    # Create console handler
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.DEBUG)
+
+    # Create file handler
+    fh = logging.FileHandler(f'{dir}/mylog.log')
+    fh.setLevel(logging.DEBUG)
+
+    # Create formatter
+    formatter = logging.Formatter('%(message)s')
+    ch.setFormatter(formatter)
+    fh.setFormatter(formatter)
+
+    # Add handlers to logger
+    logger.addHandler(ch)
+    logger.addHandler(fh)
+
+    return logger

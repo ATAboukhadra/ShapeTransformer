@@ -56,15 +56,6 @@ def decode_labels(extension: str, data: bytes):
     labels = np.load(BytesIO(data))
     obj_pose = labels['pose_y'][grasp_ind]
     rotation, translation = obj_pose[:, :3], obj_pose[:, 3]
-    # print(rotation.shape)
-    # obj_pose = np.vstack((obj_pose, np.array([[0, 0, 0, 1]], dtype=np.float32)))
-    # obj_pose[1] *= -1
-    # obj_pose[2] *= -1
-
-    # object_uvd, object_world = dexycb_dataset.get_object_mesh(object_name, cam_mat, rotation, translation)
-    # objCorners_world = calculate_corners(object_world)
-
-    # object_mesh = np.load(os.path.join(dexycb_dataset.obj_model_path, dexycb_dataset.obj_resolution, object_name + '.npy'), allow_pickle=True).tolist()
 
     mano_params = labels['pose_m']
     hand_pose2d = labels['joint_2d']
@@ -80,11 +71,7 @@ def decode_labels(extension: str, data: bytes):
         'cam_mat': cam_mat, 
         'hand_pose2d': hand_pose2d,
         'hand_pose3d': hand_pose3d,
-        'hand_verts3d': hand_verts,
-        # 'object_pose3d': objCorners_world,
-        # 'object_verts3d': object_world,
-        # 'path': extension,
-        # 'object_side': object_name + '-' + mano_side,
+        'hand_verts3d': hand_verts
     }
   
     return annotations
@@ -101,16 +88,6 @@ def decode_depth(extension: str, data: bytes):
     return depth
 
 def preprocess_sequential(sample: DataChunk):
-    # data = {
-    #         'path': image_path,
-    #         'images': temporal_images,
-    #         'pose2d': temporal_pose2d,
-    #         'boxes': temporal_boxes,
-    #         # 'patches': patches,
-    #         'pose3d': temporal_pose3d,
-    #         'mesh3d': mesh3d,
-    #     }
-
     seq_samples = [preprocess(s) for s in sample]
 
     # Concatenate the tensors for each key across all dictionaries

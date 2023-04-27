@@ -30,7 +30,7 @@ def decode_dataset(pipe: IterDataPipe, sequential=False):
 def create_pipe(in_dir, subset, args, sequential=False, factory=None):
     # DexYCB specific step
     global dexycb_dataset_dict
-    dexycb_dataset_dict[subset] = DexYCBDataset(args.meta_root)
+    dexycb_dataset_dict[subset] = DexYCBDataset(args.meta_root, subset)
 
     # Make sure to create the factory only once. It reads the metadata file at construction time.
     if factory is None:
