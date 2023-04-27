@@ -2,21 +2,27 @@ import torch
 import cv2
 import matplotlib.pyplot as plt
 import argparse
+import os
+import numpy as np
+from nimble.utils import batch_to_tensor_device
+from nimble.NIMBLELayer import NIMBLELayer
 
 def parse_args():
     
     ap = argparse.ArgumentParser()
-    ap.add_argument("--data_root", type=str, help="Directory containing additional data", default='/data/ho')
+    ap.add_argument("--data_root", type=str, help="Directory containing data", default='/data/ho')
+    ap.add_argument("--meta_root", type=str, help="Directory containing additional data", default='/data/DexYCB')
     ap.add_argument("--output_folder", type=str, help="relative path to save checkpoint", default='checkpoints/transformer')
     ap.add_argument("--batch_size", type=int, help="batch size", default='8')
     ap.add_argument("--log_interval", type=int, help="How many batches needes to log", default='50')
     ap.add_argument("--epochs", type=int, help="number of epochs after which to stop", default='10')
     ap.add_argument("--window_size", type=int, help="How many batches needes to log", default='9')
     ap.add_argument("--skip", type=int, help="how many frames to jump", default='1')
-    ap.add_argument("--d_model", type=int, help="number of features in transformer", default='128')
-    ap.add_argument("--num_workers", type=int, help="number of features in transformer", default='8')
+    ap.add_argument("--d_model", type=int, help="number of features in transformer", default='32')
+    ap.add_argument("--num_workers", type=int, help="number of workers", default='8')
     ap.add_argument("--hdf5", action='store_true', help="Load data from HDF5 file") 
     ap.add_argument("--causal", action='store_true', help="Use only previous frames")     
+    ap.add_argument("--pretrained_model", type=str, help="path to pretrained weights")     
 
     return ap.parse_args()
 
@@ -45,20 +51,12 @@ class AverageMeter(object):
         self.count += n
         self.avg = self.sum / self.count
 
-def plot_sample(batch):
-    
-    fig = plt.figure(figsize=(15, 15))
-    for i in range(batch['images'].shape[0]):
-        im = batch['images'][i].cpu().detach().numpy()
-        # img = img.transpose(1, 2, 0) * 255
-        # img = np.ascontiguousarray(img, np.uint8) 
-        for bb in batch['boxes'][i]:
-            bb = bb.detach().numpy()
-            pt1 = (bb[0], bb[1])
-            pt2 = (bb[2], bb[3])
-            cv2.rectangle(im, pt1, pt2, color=(255, 0, 0))
-        ax = fig.add_subplot(3, 3, i+1)
-        ax.imshow(im)
+def initialize_masks(batch, heads, size, p):
+  # probability of each element being 1 (True)
+
+    size = (heads * size, batch, batch)  # shape of the boolean mask
+    mask = torch.rand(size) < p
+    return mask
 
 # for i in range(batch['patches'].shape[0]):
 #     patch = batch['patches'][i]
@@ -69,3 +67,26 @@ def plot_sample(batch):
 
 # plt.imshow(im)
 # plt.show()
+
+def init_nimble():
+    device = torch.zeros(1).device
+
+    pm_dict_name = r"nimble/assets/NIMBLE_DICT_9137.pkl"
+    tex_dict_name = r"nimble/assets/NIMBLE_TEX_DICT.pkl"
+
+    if os.path.exists(pm_dict_name):
+        pm_dict = np.load(pm_dict_name, allow_pickle=True)
+        pm_dict = batch_to_tensor_device(pm_dict, device)
+
+    if os.path.exists(tex_dict_name):
+        tex_dict = np.load(tex_dict_name, allow_pickle=True)
+        tex_dict = batch_to_tensor_device(tex_dict, device)
+
+    if os.path.exists(r"nimble/assets/NIMBLE_MANO_VREG.pkl"):
+        nimble_mano_vreg = np.load("nimble/assets/NIMBLE_MANO_VREG.pkl", allow_pickle=True)
+        nimble_mano_vreg = batch_to_tensor_device(nimble_mano_vreg, device)
+    else:
+        nimble_mano_vreg=None
+
+    nlayer = NIMBLELayer(pm_dict, tex_dict, device, use_pose_pca=True, pose_ncomp=30, shape_ncomp=20, nimble_mano_vreg=nimble_mano_vreg)
+    return nlayer
