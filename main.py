@@ -19,7 +19,7 @@ logger = create_logger(args.output_folder)
 logger.info(f'combination: {args.causal, args.window_size, args.skip}')
 
 # HO3D
-if 'HO3D' in args.data_root:
+if 'HO3D' in args.data_root or 'ho' in args.data_root:
     trainset = Dataset(args.data_root, T=args.window_size, skip=args.skip, causal=args.causal, hdf5=args.hdf5)
     valset = Dataset(args.data_root, load_set='val', T=args.window_size, skip=args.skip, causal=args.causal, hdf5=args.hdf5)
     length = len(trainset) // args.batch_size
@@ -70,8 +70,6 @@ for epoch in range(args.epochs):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-
-    # print('-' * 40)
 
     pose_errors = AverageMeter()
     total_loss = 0.0
