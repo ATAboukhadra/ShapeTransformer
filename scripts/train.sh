@@ -2,8 +2,9 @@
 
 python main.py \
 --data_root /data/HO3D/ \
---batch_size 8 \
+--batch_size 32 \
 --epochs 5 \
 --hdf5 \
---log_interval 1000 \
+--window_size 9 \
+--log_interval 100 \
 # --output_folder checkpoints/transformer
