@@ -1,4 +1,10 @@
 #!/bin/bash
+pip install chumpy
+pip install h5py
+pip install trimesh
+cd manopth
+pip install .
+cd ..
 
 python main.py \
 --data_root /data/HO3D/ \
