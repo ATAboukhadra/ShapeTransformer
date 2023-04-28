@@ -32,21 +32,27 @@ elif 'DexYCB' in args.data_root:
     _, valset, val_factory = create_pipe(args.data_root, 'val', args, sequential=True)
     length = len(dataset) // args.batch_size
 
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, num_workers=0, shuffle=True)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
 valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False)
 
-profiler = cProfile.Profile()
-profiler.enable()
-sample = next(iter(trainloader))
-profiler.disable()
+# iterator = iter(trainloader)
+# sample = next(iterator)
+# sample = next(iterator)
 
-stats = pstats.Stats(profiler)
-stats.strip_dirs()
-stats.sort_stats('tottime')
-stats.print_stats()
+# profiler = cProfile.Profile()
+# profiler.enable()
+# sample = next(iterator)
+# profiler.disable()
+
+# stats = pstats.Stats(profiler)
+# stats.strip_dirs()
+# stats.sort_stats('tottime')
+# stats.print_stats()
 
 # exit()
-model = PoseGraFormer(input_dim=2, output_dim=3, d_model=args.d_model, num_frames=args.window_size, normalize_before=True).to('cuda')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+model = PoseGraFormer(input_dim=2, output_dim=3, d_model=args.d_model, num_frames=args.window_size, normalize_before=True).to(device)
 # model = PoseFormer(input_dim=2, output_dim=3, d_model=args.d_model, num_frames=w, normalize_before=True).to('cuda')
 # model = GraFormer(hid_dim=128, coords_dim=(2, 3),  num_pts=21, temporal=False).to('cuda')
 
@@ -63,8 +69,8 @@ for epoch in range(args.epochs):
     total_loss = 0.0
     pose_errors = AverageMeter()
     for idx, batch in enumerate(trainloader):
-        src = batch['pose2d'].to('cuda')
-        trg = batch['pose3d'].to('cuda')
+        src = batch['pose2d'].to(device)
+        trg = batch['pose3d'].to(device)
         bs = src.shape[0]
 
         out = model(src)
@@ -88,8 +94,8 @@ for epoch in range(args.epochs):
     pose_errors = AverageMeter()
     total_loss = 0.0
     for idx, batch in enumerate(valloader):
-        src = batch['pose2d'].to('cuda')
-        trg = batch['pose3d'].to('cuda')
+        src = batch['pose2d'].to(device)
+        trg = batch['pose3d'].to(device)
 
         bs = src.shape[0]
         out = model(src)
