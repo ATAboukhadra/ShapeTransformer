@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # import libraries
+import time
 import numpy as np
 import os
 import torch.utils.data as data
@@ -49,7 +50,6 @@ class Dataset(data.Dataset):
 
         image_path = self.images[index]
         temporal_images, temporal_pose2d, temporal_boxes, temporal_pose3d = self.temporal_batch(index, self.T)
-        
         # inputs = self.transform(original_image)  # [:3]
         # if self.load_set != 'test':
             # Loading 2D Mesh for bounding box calculation
@@ -75,12 +75,13 @@ class Dataset(data.Dataset):
         # Load image and apply preprocessing if any
         image_path = self.images[index]
 
-        if self.hdf5_file is not None:
-            data = np.array(self.hdf5_file[image_path])
-            original_image = np.array(Image.open(io.BytesIO(data)))[..., :3]
-        else:
-            original_image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
-
+        # if self.hdf5_file is not None:
+        #     data = np.array(self.hdf5_file[image_path])
+        #     original_image = np.array(Image.open(io.BytesIO(data)))[..., :3]
+        # else:
+        #     original_image = cv2.cvtColor(cv2.imread(image_path), cv2.COLOR_BGR2RGB)
+        # print(original_image.shape, original_image.dtype)
+        original_image = np.zeros((480, 640, 3), dtype=np.uint8)
         return original_image
 
     def __len__(self):
@@ -88,12 +89,13 @@ class Dataset(data.Dataset):
 
 
     def single_sample(self, index):
+        # t1 = time.time()
         img = torch.from_numpy(self.read_img(index)).to(torch.float)
         point2d = torch.from_numpy(self.points2d[index][:self.num_kps]).to(torch.float)
         boxes, _ = self.calculate_bounding_box(index)
         boxes = torch.from_numpy(boxes).to(torch.float)
         point3d = torch.from_numpy(self.points3d[index][:self.num_kps]).to(torch.float)
-
+        # print('single sample time: ', time.time() - t1)
         return img, point2d, boxes, point3d
 
     def initalize_temporal_tensors(self, index, T):

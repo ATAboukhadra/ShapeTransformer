@@ -1,3 +1,4 @@
+import time
 from dataset.DexYCB_dataset import DexYCBDataset
 import numpy as np
 from io import BytesIO
@@ -10,7 +11,10 @@ from torch.utils.data.datapipes.datapipe import DataChunk
 dexycb_dataset_dict = {'train': None, 'val': None, 'test': None}
 
 def decode_rgb(extension: str, data: bytes):
-    rgb = cv2.cvtColor(cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
+    # rgb = cv2.cvtColor(cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_COLOR), cv2.COLOR_BGR2RGB)
+    rgb = np.zeros((480, 640, 3), dtype=np.uint8)
+    # print('rgb', rgb.shape, rgb.dtype)
+
     return rgb
 
 def calculate_corners(verts):
@@ -33,6 +37,7 @@ def calculate_corners(verts):
     return obj_bb
 
 def decode_labels(extension: str, data: bytes):
+
     splits = extension.split('_')
     subject_id = splits[-4].split('/')[-1]
     seq_id = subject_id + '/' + splits[-3] + '_' + splits[-2]
@@ -73,18 +78,19 @@ def decode_labels(extension: str, data: bytes):
         'hand_pose3d': hand_pose3d,
         'hand_verts3d': hand_verts
     }
-  
     return annotations
 
 def decode_depth(extension: str, data: bytes):
     """Decode the depth image to depth map in millimeters"""
-    dpt = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_ANYDEPTH)
+    # dpt = cv2.imdecode(np.frombuffer(data, dtype=np.uint8), cv2.IMREAD_ANYDEPTH)
 
-    # threshold at 2 meters
-    depth_threshold = 2000
-    dpt[dpt>depth_threshold] = depth_threshold
-    dpt[dpt==0] = depth_threshold
-    depth = torch.from_numpy(dpt.astype(np.float32)) 
+    # # threshold at 2 meters
+    # depth_threshold = 2000
+    # dpt[dpt>depth_threshold] = depth_threshold
+    # dpt[dpt==0] = depth_threshold
+    # depth = torch.from_numpy(dpt.astype(np.float32)) 
+    # print('depth', depth.shape, depth.dtype)
+    depth = torch.zeros((480, 640), dtype=torch.float32)
     return depth
 
 def preprocess_sequential(sample: DataChunk):
@@ -98,7 +104,6 @@ def preprocess_sequential(sample: DataChunk):
             temporal_sample[key] = torch.cat([s[key] for s in seq_samples], dim=0)
         else:
             temporal_sample[key] = np.concatenate([d[key] for d in seq_samples], axis=0)
-
     return temporal_sample
 
 def preprocess(sample: DataChunk):

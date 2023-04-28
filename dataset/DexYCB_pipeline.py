@@ -3,6 +3,7 @@
 # Written by Stephan Krauß <Stephan.Krauss@dfki.de>, December 2022
 ##############################################################################
 from argparse import ArgumentParser
+import time
 
 from torchdata.datapipes.iter import IterDataPipe
 
@@ -20,11 +21,13 @@ def decode_dataset(pipe: IterDataPipe, sequential=False):
                    "color": decode_rgb,
                    "labels": decode_labels}
     # apply the decoding functions to each sample
+
     pipe = pipe.map(fn=Decoder(decoder_map))
     if sequential:
         pipe = pipe.map(fn=preprocess_sequential)
     else:
         pipe = pipe.map(fn=preprocess)
+
     return pipe
 
 def create_pipe(in_dir, subset, args, sequential=False, factory=None):

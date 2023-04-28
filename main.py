@@ -1,3 +1,4 @@
+import time
 import h5py
 import os
 import torch.nn as nn
@@ -10,6 +11,8 @@ from dataset.DexYCB_pipeline import create_pipe
 from models.poseformer import PoseFormer, PoseGraFormer
 from models.graformer import GraFormer
 from utils import mpjpe, AverageMeter, parse_args, initialize_masks, create_logger
+import cProfile
+import pstats
 
 args = parse_args()
 
@@ -29,9 +32,20 @@ elif 'DexYCB' in args.data_root:
     _, valset, val_factory = create_pipe(args.data_root, 'val', args, sequential=True)
     length = len(dataset) // args.batch_size
 
-trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=True)
+trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size, num_workers=0, shuffle=True)
 valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, num_workers=args.num_workers, shuffle=False)
 
+profiler = cProfile.Profile()
+profiler.enable()
+sample = next(iter(trainloader))
+profiler.disable()
+
+stats = pstats.Stats(profiler)
+stats.strip_dirs()
+stats.sort_stats('tottime')
+stats.print_stats()
+
+# exit()
 model = PoseGraFormer(input_dim=2, output_dim=3, d_model=args.d_model, num_frames=args.window_size, normalize_before=True).to('cuda')
 # model = PoseFormer(input_dim=2, output_dim=3, d_model=args.d_model, num_frames=w, normalize_before=True).to('cuda')
 # model = GraFormer(hid_dim=128, coords_dim=(2, 3),  num_pts=21, temporal=False).to('cuda')
