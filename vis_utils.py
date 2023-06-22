@@ -249,7 +249,7 @@ def show3DHandJoints(ax, verts, mode='pred', isOpenGLCoords=False):
     :param ax: matplotlib axis
     :param verts: ground truth annotation
     '''
-
+    ax.axis('off')
     coordChangeMat = np.array([[1., 0., 0.], [0, -1., 0.], [0., 0., -1.]], dtype=np.float32)
     if isOpenGLCoords:
         verts = verts.dot(coordChangeMat.T)
