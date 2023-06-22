@@ -10,6 +10,9 @@ import pymeshlab
 from pathlib import Path
 from pytorch3d.structures.meshes import Meshes
 import pytorch3d.ops
+import cv2
+import matplotlib.pyplot as plt
+from pytorch3d.renderer import Textures
 
 ROOT_JOINT_IDX = 0  # wrist
 DOF2_BONES = [1, 2, 4, 5, 8, 9, 12, 13, 16, 17]
@@ -391,7 +394,6 @@ def save_textured_nimble(fname, skin_v, tex_img):
 
     faces = np.array(faces)
     vertices = []
-    texture = []
 
     with open(obj_name_skin, "w") as f:
         f.write("mtllib {:s}\n".format(mtl_name.name))
@@ -400,32 +402,8 @@ def save_textured_nimble(fname, skin_v, tex_img):
             f.writelines("v {:.5f} {:.5f} {:.5f}\n".format(v[0], v[1], v[2]))
             vertices.append([v[0], v[1], v[2]])
             
-            if i in v_rgb_map.keys():
-                rgbi = v_rgb_map[i]
-                rgb = vt_rgb[rgbi]
-                texture.append(rgb)
-            else:
-                texture.append([0, 0, 0])
             i+=1
         f.writelines(f_uv)
-
-    vertices = np.array(vertices)
-    texture = np.array(texture)
-
-    texture_mesh_fname = fname.name.split('.')[0] + 'tex_mesh'
-    write_obj(vertices, faces, texture_mesh_fname, texture)
-
-    # mesh = o3d.io.read_triangle_mesh(obj_name_skin)
-    # pcd = o3d.geometry.PointCloud()
-    # pcd.points = mesh.vertices
-    # pcd.colors = mesh.vertex_colors
-    # pcd.normals = mesh.vertex_normals
-    # ms = pymeshlab.MeshSet()
-    # ms.load_new_mesh(obj_name_skin.name)
-
-    # ms.save_current_mesh(texture_mesh_fname + '.obj', save_vertex_normal=True, save_vertex_color=True, save_polygonal=True)
-
-    # print(ms.current_mesh().face_color_matrix())
 
     print("save to", fname)
 
@@ -451,3 +429,4 @@ def smooth_mesh(mesh_p3d):
     target_mv[nan_mv] = mesh_p3d.verts_padded()[nan_mv]  
     mesh_p3d_smooth_fixnan = Meshes(target_mv, mesh_p3d.faces_padded())
     return mesh_p3d_smooth_fixnan
+
