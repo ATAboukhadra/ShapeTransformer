@@ -1,10 +1,9 @@
 #!/bin/bash
-pip install chumpy
-pip install h5py
-pip install trimesh
-cd manopth
-pip install .
-cd ..
+
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export USE_OPENMP=1  # prevents openblas to override OMP_NUM_THREADS
 
 python main.py \
 --data_root /data/HO3D/ \

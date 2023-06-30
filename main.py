@@ -52,9 +52,11 @@ valloader = torch.utils.data.DataLoader(valset, batch_size=args.batch_size, num_
 # exit()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-model = PoseGraFormer(input_dim=2, output_dim=3, d_model=args.d_model, num_frames=args.window_size, normalize_before=True).to(device)
+if args.window_size == 1:
+    model = GraFormer(hid_dim=128, coords_dim=(2, 3), num_pts=21, temporal=False).to(device)
+else:
+    model = PoseGraFormer(input_dim=2, output_dim=3, d_model=args.d_model, num_frames=args.window_size, normalize_before=True).to(device)
 # model = PoseFormer(input_dim=2, output_dim=3, d_model=args.d_model, num_frames=w, normalize_before=True).to('cuda')
-# model = GraFormer(hid_dim=128, coords_dim=(2, 3),  num_pts=21, temporal=False).to('cuda')
 
 num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 logger.info(f'total number of parameters: {num_params}')
