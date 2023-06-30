@@ -37,7 +37,7 @@ class Stohrmer(nn.Module):
         features_list = []
         for img_batch in img_list:
             img_batch = self.resize(img_batch.to(self.device))
-            features = self.resnet18(img_batch).squeeze((-1, -2))
+            features = self.resnet18(img_batch).squeeze(-1).squeeze(-1)
             features_list.append(features)
 
         features_tensor = torch.stack(features_list, dim=0)
