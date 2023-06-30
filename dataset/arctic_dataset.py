@@ -44,6 +44,7 @@ class ArcticDataset(Dataset):
                                             #  transforms.Resize(500, antialias=True)
                                              ])
         # self.iterable = iterable
+        self.total, self.bad = 0, 0
         if not iterable: self.scan_dataset()
 
     def scan_dataset(self):
@@ -75,15 +76,16 @@ class ArcticDataset(Dataset):
         ego_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.egocam.dist.npy')
         
         # ego_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.egocam.dist.npy')
+        self.total += 1
         try:
             ego_annotations = np.load(self.annotations.open(ego_annotations_path), allow_pickle=True).item()
-            print(f'loaded {ego_annotations_path}')
         except:
             ego_annotations = {}
             ego_annotations['R_k_cam_np'] = np.zeros((1000, 3, 3))
             ego_annotations['T_k_cam_np'] = np.zeros((1000, 3, 1))
             ego_annotations['intrinsics'] = np.zeros((3, 3))
-            print(f'bad zip file {ego_annotations_path}')
+            self.bad += 1
+            print('bad loads', self.bad/self.total)
 
         if camera > 0:
             cam_ext = torch.tensor(self.meta[subject]['world2cam'][camera-1], device=self.device).unsqueeze(0)
@@ -109,15 +111,16 @@ class ArcticDataset(Dataset):
 
         # hand_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.mano.npy')
         hand_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.mano.npy')
+        self.total += 1
         try:
             hand_annotations = np.load(self.annotations.open(hand_annotations_path), allow_pickle=True).item()
-            print('good zip file', hand_annotations_path)
         except: # Bad zip file
             hand_annotations = {
                 'right': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))},
                 'left': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))}
             }
-            print('bad zip file', hand_annotations_path)
+            self.bad += 1
+            print('bad loads', self.bad/self.total)
 
         hand_dict = {}
         for side in ['right', 'left']:
@@ -142,12 +145,13 @@ class ArcticDataset(Dataset):
 
         # obj_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.object.npy')
         obj_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.object.npy')
+        self.total += 1
         try:
             obj_annotations = np.load(self.annotations.open(obj_annotations_path), allow_pickle=True)
-            print('good zip file', obj_annotations_path)
         except: # Bad zip file
             obj_annotations = np.zeros((1000, 7), dtype=np.float32)
-            print('bad zip file', obj_annotations_path)
+            self.bad += 1
+            print('bad loads', self.bad/self.total)
 
         obj_dict = {}
         num_frames = obj_annotations.shape[0] - 1
