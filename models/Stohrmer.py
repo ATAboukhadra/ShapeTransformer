@@ -4,6 +4,8 @@ from models.poseformer import PoseGraFormer
 from torchvision.models import resnet18, ResNet18_Weights
 from torchvision import transforms
 from models.graformer import GraFormer
+from manopth.manolayer import ManoLayer
+from dataset.arctic_utils import transform_points_batch
 
 class Stohrmer(nn.Module):
     def __init__(self, device, num_kps=21, num_frames=9, spatial_dim=32, temporal_dim=128, extra_features=32):
@@ -11,6 +13,10 @@ class Stohrmer(nn.Module):
         self.device = device
 
         # self.graformer = PoseGraFormer(num_kps=num_kps, num_frames=num_frames, d_model=32)
+        mano_layer_right = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=False, use_pca=False).to(device)
+        mano_layer_left = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=False, use_pca=False, side='left').to(device)
+        self.mano_layers = {'right': mano_layer_right, 'left': mano_layer_left}
+
         self.spatial_encoder = GraFormer(num_pts=num_kps, coords_dim=(2, spatial_dim))
         num_features = spatial_dim * num_kps + 512
 
@@ -24,6 +30,14 @@ class Stohrmer(nn.Module):
 
         output_dim = 10 * 2 + 11 # 10 MANO Shape, 11 Object Classes
         self.output = nn.Linear(extra_features * num_frames, output_dim)
+
+    def decode_mano(self, pose, shape, trans, side, cam_ext):
+        verts_world, kps_world = self.mano_layers[side](pose, shape, trans)
+        verts_world /= 1000
+        kps_world /= 1000
+        verts_cam = transform_points_batch(cam_ext, verts_world)
+        kps_cam = transform_points_batch(cam_ext, kps_world)
+        return verts_cam, kps_cam
     
     def forward(self, batch_dict):
         # 2D Pose Spatial Features

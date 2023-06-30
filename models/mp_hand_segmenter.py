@@ -39,7 +39,7 @@ def create_segmenter(hand=True):
     return segmenter 
 
 hand_segmenter = create_segmenter(True)
-obj_segmenter = create_segmenter(False)
+# obj_segmenter = create_segmenter(False)
 
 def draw_landmarks_on_image(rgb_image, detection_result):
   hand_landmarks_list = detection_result.hand_landmarks

@@ -19,10 +19,10 @@ target_idx = args.window_size-1 if args.causal else args.window_size // 2
 if not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
 logger = create_logger(args.output_folder)
 
-train_pipeline, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', device, args.window_size)
+train_pipeline, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', torch.device('cpu'), args.window_size)
 trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, collate_fn=batch_samples)
 
-val_pipeline, _, _ = create_pipe(args.data_root, args.meta_root, 'val', device, args.window_size, factory=factory, arctic_decoder=decoder)
+val_pipeline, _, _ = create_pipe(args.data_root, args.meta_root, 'val', torch.device('cpu'), args.window_size, factory=factory, arctic_decoder=decoder)
 valloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, collate_fn=batch_samples)
 
 dataset = decoder.dataset
@@ -44,13 +44,17 @@ for e in range(args.epochs):
 
     errors = {k: AverageMeter() for k in keys}
     for i, data_dict in enumerate(trainloader):
+
+        for k in data_dict.keys():
+            data_dict[k] = data_dict[k].to(device) if isinstance(data_dict[k], torch.Tensor) else data_dict[k]
+
         outputs = model(data_dict)
         loss = calculate_loss(outputs, data_dict)
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         
-        calculate_error(outputs, data_dict, errors, dataset, target_idx)
+        calculate_error(outputs, data_dict, errors, dataset, target_idx, model)
 
         if (i+1) % args.log_interval == 0:
             error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
@@ -61,7 +65,7 @@ for e in range(args.epochs):
 
     for i, data_dict in enumerate(valloader):
         outputs = model(data_dict)
-        calculate_error(outputs, data_dict, errors, dataset, target_idx)
+        calculate_error(outputs, data_dict, errors, dataset, target_idx, model)
     
     error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
     logger.info(f'epoch {e+1} val: {error_list}')

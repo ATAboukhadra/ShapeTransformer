@@ -291,7 +291,7 @@ def calculate_loss(outputs, targets):
 
     return total_loss
 
-def calculate_error(outputs, targets, errors, dataset, target_idx):
+def calculate_error(outputs, targets, errors, dataset, target_idx, model):
 
     # Calculate hand mesh error
     bs, t = targets[f'left_rot'].shape[:2]
@@ -308,8 +308,8 @@ def calculate_error(outputs, targets, errors, dataset, target_idx):
             mano_gt[i] = mano_gt[i].view(bs * t, mano_gt[i].shape[-1])
             mano_pred[i] = mano_pred[i].view(bs * t, mano_pred[i].shape[-1])
 
-        mesh_gt, pose_gt = dataset.decode_mano(torch.cat((mano_gt[0], mano_gt[1]), dim=1), mano_gt[2], mano_gt[3], side, cam_ext)
-        mesh_pred, pose_pred = dataset.decode_mano(torch.cat((mano_pred[0], mano_pred[1]), dim=1), mano_pred[2], mano_pred[3], side, cam_ext)
+        mesh_gt, pose_gt = model.decode_mano(torch.cat((mano_gt[0], mano_gt[1]), dim=1), mano_gt[2], mano_gt[3], side, cam_ext)
+        mesh_pred, pose_pred = model.decode_mano(torch.cat((mano_pred[0], mano_pred[1]), dim=1), mano_pred[2], mano_pred[3], side, cam_ext)
 
         # Calculate hand mesh error for only the middle frame or the last frame
         mesh_err = mpjpe(mesh_pred[target_idx], mesh_gt[target_idx]) * 1000

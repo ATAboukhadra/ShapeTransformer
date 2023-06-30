@@ -21,11 +21,13 @@ from torchvision import transforms
 class ArcticDataset(Dataset):
     def __init__(self, root, objects_root, device, iterable=False):
         self.root = root
+        
         mano_layer_right = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=False, use_pca=False).to(device)
         faces_right = mano_layer_right.th_faces.cpu().detach().numpy()
 
         mano_layer_left = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=False, use_pca=False, side='left').to(device)
         faces_left = mano_layer_left.th_faces.cpu().detach().numpy()
+        
         self.mano_layers = {'right': mano_layer_right, 'left': mano_layer_left}
         self.hand_faces = {'right': faces_right, 'left': faces_left}
 
@@ -138,13 +140,13 @@ class ArcticDataset(Dataset):
 
     def transform_obj(self, obj, articulation, rot, trans, cam_ext):
         obj_verts = {}
-        z_axis = torch.FloatTensor(np.array([0, 0, -1])).view(1, 3).to(self.device)
+        z_axis = torch.FloatTensor(np.array([0, 0, -1])).view(1, 3).to(articulation.device)
         quat_arti = axis_angle_to_quaternion(z_axis * articulation).unsqueeze(1)
         quat_global = axis_angle_to_quaternion(rot).unsqueeze(1)
 
         bs = rot.shape[0]
         for part in ['top', 'bottom']:
-            verts = self.objects[obj][part][0].unsqueeze(0).repeat(bs, 1, 1)#.unsqueeze(0)
+            verts = self.objects[obj][part][0].unsqueeze(0).repeat(bs, 1, 1).to(articulation.device)#.unsqueeze(0)
             num_verts = verts.shape[1]
             quat_arti_mesh, quat_global_mesh = quat_arti.repeat(1, num_verts, 1), quat_global.repeat(1, num_verts, 1)
             verts = quaternion_apply(quat_arti_mesh, verts) if part == 'top' else verts
@@ -178,10 +180,6 @@ class ArcticDataset(Dataset):
         _, pose2d, _, _, _ = detect_hand(img, segment=False)
 
         img = self.transform(img).to(self.device)
-
-        # hands_pose2d_placeholder = torch.zeros((2, 21, 2))
-        # hands_pose2d = torch.stack((torch.tensor(x).view(-1, 21), torch.tensor(y).view(-1, 21)), dim=2)
-        # hands_pose2d_placeholder[:hands_pose2d.shape[0]] = hands_pose2d
 
         cam_ext, cam_int = self.load_camera_matrix(subject, seq_name, camera_num, frame_num)
         hand_dict = self.load_hand_annotations(subject, seq_name, frame_num, cam_ext, cam_int)
