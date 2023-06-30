@@ -101,7 +101,15 @@ class ArcticDataset(Dataset):
 
         # hand_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.mano.npy')
         hand_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.mano.npy')
-        hand_annotations = np.load(self.annotations.open(hand_annotations_path), allow_pickle=True).item()
+        try:
+            hand_annotations = np.load(self.annotations.open(hand_annotations_path), allow_pickle=True).item()
+        except: # Bad zip file
+            hand_annotations = {
+                'right': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))},
+                'left': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))}
+            }
+            print(hand_annotations_path)
+
         hand_dict = {}
         for side in ['right', 'left']:
 
