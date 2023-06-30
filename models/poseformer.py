@@ -109,7 +109,7 @@ class PoseFormer(nn.Module):
 
 class PoseGraFormer(nn.Module):
 
-    def __init__(self, input_dim=2, output_dim=3, d_model=128, nhead=8, num_encoder_layers=4, num_kps=21, num_frames=9, normalize_before=False):
+    def __init__(self, input_dim=2, output_dim=3, d_model=128, nhead=8, num_encoder_layers=4, num_kps=21, num_frames=9):
         
         super().__init__()
         self.d_model = d_model

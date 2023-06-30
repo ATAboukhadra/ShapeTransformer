@@ -239,6 +239,7 @@ def load_sample(data_path, split, seq_name, frame_num, device):
 
 
 def visualize_image_with_mesh(img, rendered_image):
+
     # Load the RGB image
     # Create a figure and axes for plotting
     ax = plt.subplot(1, 2, 1)
@@ -263,3 +264,81 @@ def visualize_image_with_mesh(img, rendered_image):
     plt.savefig('output/projection.png')
     plt.clf()
     plt.close()
+
+L2 = torch.nn.MSELoss()
+CEL = torch.nn.CrossEntropyLoss()
+
+def calculate_loss(outputs, targets):
+    losses = {}
+
+    for side in ['left', 'right']:
+        mano_gt = targets[f'{side}_rot'], targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']
+        mano_pred = outputs[f'{side}_rot'], outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']
+        loss = sum(L2(mano_gt[i], mano_pred[i]) for i in range(len(mano_gt)))
+        losses[f'{side}_mano'] = loss
+
+    obj_pose, obj_class = outputs['obj_pose'], outputs['obj_class']
+    obj_pred = obj_pose[:, :, :1], obj_pose[:, :, 1:4], obj_pose[:, :, 4:]
+    obj_gt = targets['articulation'], targets['rot'], targets['trans']
+
+    loss = sum(L2(obj_gt[i], obj_pred[i]) for i in range(len(obj_gt)))
+
+    obj_class_loss = CEL(obj_class, targets['label'])
+    loss += obj_class_loss
+    losses['obj'] = loss
+        
+    total_loss = sum(loss for loss in losses.values())
+
+    return total_loss
+
+def calculate_error(outputs, targets, errors, dataset, target_idx):
+
+    # Calculate hand mesh error
+    bs, t = targets[f'left_rot'].shape[:2]
+    cam_ext = targets['cam_ext'].unsqueeze(1).view(bs * t, 4, 4)
+
+    for side in ['left', 'right']:
+        mano_gt = [targets[f'{side}_rot'], targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']]
+        mano_pred = [outputs[f'{side}_rot'], outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']]
+
+        mano_gt[2] = mano_gt[2].unsqueeze(1).repeat(1, t, 1)
+        mano_pred[2] = mano_pred[2].unsqueeze(1).repeat(1, t, 1)
+
+        for i in range(len(mano_gt)):
+            mano_gt[i] = mano_gt[i].view(bs * t, mano_gt[i].shape[-1])
+            mano_pred[i] = mano_pred[i].view(bs * t, mano_pred[i].shape[-1])
+
+        mesh_gt, pose_gt = dataset.decode_mano(torch.cat((mano_gt[0], mano_gt[1]), dim=1), mano_gt[2], mano_gt[3], side, cam_ext)
+        mesh_pred, pose_pred = dataset.decode_mano(torch.cat((mano_pred[0], mano_pred[1]), dim=1), mano_pred[2], mano_pred[3], side, cam_ext)
+
+        # Calculate hand mesh error for only the middle frame or the last frame
+        mesh_err = mpjpe(mesh_pred[target_idx], mesh_gt[target_idx]) * 1000
+        pose_err = mpjpe(pose_pred[target_idx], pose_gt[target_idx]) * 1000
+        errors[f'{side}_mesh_err'].update(mesh_err.item(), bs)
+        errors[f'{side}_pose_err'].update(pose_err.item(), bs)
+
+    obj_pose, obj_class = outputs['obj_pose'], outputs['obj_class']
+
+    # Calculate object class accuracy
+    pred_labels = torch.argmax(obj_class, dim=1)
+    pred_object_names = [dataset.object_names[l] for l in pred_labels]
+    acc = (pred_labels == targets['label']).float().mean()
+    errors['obj_acc'].update(acc, bs)
+
+    # Calculate object mesh error
+    obj_pred = obj_pose[:, :, :1], obj_pose[:, :, 1:4], obj_pose[:, :, 4:]
+    obj_gt = targets['articulation'], targets['rot'], targets['trans']
+    
+    object_names = [dataset.object_names[l] for l in targets['label']]
+
+    for i in range(len(object_names)):
+        cam_ext_i = cam_ext.view(bs, t, 4, 4)[i]
+        obj_verts_pred = dataset.transform_obj(object_names[i], obj_pred[0][i], obj_pred[1][i], obj_pred[2][i], cam_ext_i)
+        obj_verts_gt = dataset.transform_obj(pred_object_names[i], obj_gt[0][i], obj_gt[1][i], obj_gt[2][i], cam_ext_i)
+        for part in ['top', 'bottom']:
+            if obj_verts_pred[part].shape[1] != obj_verts_gt[part].shape[1]:
+                continue
+            obj_mesh_err = mpjpe(obj_verts_pred[part][target_idx], obj_verts_gt[part][target_idx]) * 1000
+            errors[f'{part}_obj_err'].update(obj_mesh_err.item(), 1)
+
+    return errors

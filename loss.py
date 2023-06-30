@@ -16,7 +16,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from utils import load_texture, project_3D_points, visualize_image_with_mesh, load_sample
 from render_utils import create_mesh, create_renderer, render_mesh
-from mp_hand_segmenter import detect_hand
+from models.mp_hand_segmenter import detect_hand
 from vis_utils import show3DHandJoints
 from pytorch3d.io import load_obj
 from pytorch3d.structures import join_meshes_as_scene

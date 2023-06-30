@@ -1,83 +1,82 @@
 import matplotlib.pyplot as plt
 import torch
 import numpy as np
-import os
-import json
-import cv2
-from arctic_dataset import ArcticDataset
-from torch.utils.data import DataLoader
 from render_utils import create_renderer, render_arctic_mesh
-from mp_hand_segmenter import detect_hand
 from vis_utils import showHandJoints
+from dataset.arctic_pipeline import create_pipe, batch_samples
 from tqdm import tqdm
+
 np.set_printoptions(precision=2)
+
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 colors = {'right': 'blue', 'left': 'red', 'top': 'green', 'bottom': 'yellow'}
 
-root = '../arctic/data/arctic_data/data'
-objects_root = '../arctic_objects'
+root = '/ds-av/public_datasets/arctic/td_p1_sequential_nocropped/'
+objects_root = 'dataset/arctic_objects'
+batch_size = 1
+num_workers = 0
+sliding_window_size = 9
 
-img = cv2.cvtColor(cv2.imread(os.path.join(root, 'images/s01/box_use_02/1/00175.jpg')), cv2.COLOR_BGR2RGB)
-_, x, y, crop, _,_ = detect_hand(img, segment=False)
-plt.imshow(img)
-# plt.scatter(x[0], y[0], c='r')
-# plt.scatter(x[1], y[1], c='b')
-# plt.show()
-# print('------')
-# splits = np.load(os.path.join(root, ''), allow_pickle=True).item()
-# p1 = json.load(open(os.path.join(root, 'splits_json/protocol_p1.json')))
-# p2 = json.load(open(os.path.join(root, 'splits_json/protocol_p2.json')))
+train_pipeline, decoder, factory = create_pipe(root, objects_root, 'train', device, sliding_window_size)
+trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=num_workers, collate_fn=batch_samples)
 
-dataset = ArcticDataset(root, objects_root, device=device)
+val_pipeline, _, _ = create_pipe(root, objects_root, 'val', device, sliding_window_size, factory=factory, arctic_decoder=decoder)
+valloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=num_workers, collate_fn=batch_samples)
+
+# dataset = ArcticDataset(root, objects_root, device=device)
+dataset = decoder.dataset
 hand_faces = dataset.hand_faces
 
-loader = DataLoader(dataset, batch_size=1, shuffle=True)
-iterable = iter(loader)
+for i, data_dict in enumerate(trainloader):
 
-for i in tqdm(range(10000)):
-    data_dict = next(iterable)
-    if data_dict['articulation'][0] < 0.2:
+    if data_dict['articulation'][0][0] < 0.2:
         continue
-
+    
     cam_int = data_dict['cam_int'][0]
     fx, fy, cx, cy = cam_int[0, 0], cam_int[1, 1], cam_int[0, 2], cam_int[1, 2]
     K = torch.tensor([[[fx, 0, cx, 0], [0, fy, cy, 0], [0, 0, 0, 1], [0, 0, 1, 0]]], device=device)
-    image_sizes = [(img.shape[0], img.shape[1]) for img in data_dict['img']]
+    # image_sizes = [(img.shape[0], img.shape[1]) for img in data_dict['img'][0]]
+    image_sizes = (data_dict['img'][0][0].shape[-2:], )
     renderer = create_renderer(K, device, image_size=image_sizes)
 
-    img = data_dict['img'][0].cpu().numpy()
     # plt.imshow(img)
-    if data_dict['hands_pose2d'][0].shape[0] > 0:
-        for hand in data_dict['hands_pose2d'][0]:
-            img = showHandJoints(img, hand.cpu().numpy())
-    plt.subplot(1, 2, 1)
-    plt.imshow(img)
-    # plt.show()
-    art = data_dict['articulation'].cpu().numpy()
-    rot = data_dict['rot'][0].cpu().numpy()
-    trans = data_dict['trans'][0].cpu().numpy()
-    print('Sample Name:', data_dict['key'][0], 'Articulation: ', art, ' Rotation:', rot, 'Translation:', trans)
-    # print('Articuldata_dict['articulation'][0], data_dict['rot'][0], data_dict['trans'][0])
     # Plot 2D hand pose
-    pose2d = data_dict['hands_pose2d'][0].cpu().numpy().reshape(-1, 2)
-    # print(pose2d.shape, pose2d)
-    # plt.scatter(pose2d[:, 0], pose2d[:, 1], c='r')
 
-    verts_list, faces_list, textures_list = [], [], []
-    for mesh in colors.keys():
+    # plt.show()
+    articulation = data_dict['articulation'][0]
+    rot = data_dict['rot'][0]
+    trans = data_dict['trans'][0]
+    object_name = data_dict['object_name'][0]
+    cam_ext = data_dict['cam_ext'][0]
+    # print('Sample Name:', data_dict['key'][0], 'Articulation: ', art, ' Rotation:', rot, 'Translation:', trans)
 
-        verts = data_dict[f'{mesh}_verts_cam']
-        object_name = data_dict['object_name'][0]
-        faces = dataset.objects[object_name][mesh][1].verts_idx if mesh in ['top', 'bottom'] else torch.tensor(hand_faces[mesh], device=device)
-        texture = dataset.objects[object_name][mesh][2] if mesh in ['top', 'bottom'] else None
-        verts_list.append(verts)
-        faces_list.append(faces)
-        textures_list.append(texture)        
+    obj_verts = dataset.transform_obj(object_name, articulation, rot, trans, cam_ext)
 
-    rendered_image, _ = render_arctic_mesh(verts_list, faces_list, textures_list, renderer)
-    plt.subplot(1, 2, 2)
-    plt.imshow(rendered_image[0].cpu().numpy())
-    plt.axis('off')
+    for i in tqdm(range(data_dict['img'][0].shape[0])):
+        img = data_dict['img'][0][i].cpu().numpy().transpose(1, 2, 0)
+        img = np.ascontiguousarray(img * 255, np.uint8)
+
+        if data_dict['hands_pose2d'][0][0].shape[0] > 0:
+            for hand in data_dict['hands_pose2d'][0][i]:
+                img = showHandJoints(img, hand.cpu().numpy())
+        plt.subplot(3, 3, i+1)
+        plt.imshow(img)
+
+        verts_list, faces_list, textures_list = [], [], []
+    
+        for mesh in colors.keys():
+
+            verts = data_dict[f'{mesh}_verts'][0][i].unsqueeze(0) if mesh in ['right', 'left'] else obj_verts[mesh][i].unsqueeze(0)
+            faces = dataset.objects[object_name][mesh][1].verts_idx if mesh in ['top', 'bottom'] else torch.tensor(hand_faces[mesh], device=device)
+            texture = dataset.objects[object_name][mesh][2] if mesh in ['top', 'bottom'] else None
+            verts_list.append(verts)
+            faces_list.append(faces)
+            textures_list.append(texture)        
+
+        # rendered_image, _ = render_arctic_mesh(verts_list, faces_list, textures_list, renderer)
+        # plt.subplot(1, 2, 2)
+        # plt.imshow(rendered_image[0].cpu().numpy())
+        plt.axis('off')
     plt.show()
 
