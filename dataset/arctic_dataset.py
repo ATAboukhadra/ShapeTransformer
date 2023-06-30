@@ -108,7 +108,7 @@ class ArcticDataset(Dataset):
                 'right': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))},
                 'left': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))}
             }
-            print(hand_annotations_path)
+            print('bad zip file', hand_annotations_path)
 
         hand_dict = {}
         for side in ['right', 'left']:
@@ -118,9 +118,9 @@ class ArcticDataset(Dataset):
             for component in ['rot', 'pose', 'shape', 'trans']:
                 if component != 'shape':
                     anno_comp = anno[component]
-                    comp_tensor = torch.tensor(anno_comp[min(frame_num, anno_comp.shape[0]-1)], device=self.device)
+                    comp_tensor = torch.tensor(anno_comp[min(frame_num, anno_comp.shape[0]-1)], dtype=torch.float32, device=self.device)
                 else:
-                    comp_tensor = torch.tensor(anno[component], device=self.device)
+                    comp_tensor = torch.tensor(anno[component], dtype=torch.float32, device=self.device)
                 hand.append(comp_tensor.unsqueeze(0))
                 hand_dict[f'{side}_{component}'] = comp_tensor
 
