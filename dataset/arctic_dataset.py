@@ -90,10 +90,10 @@ class ArcticDataset(Dataset):
             cam_int = torch.tensor(self.meta[subject]['intris_mat'][camera-1], device=self.device)
         else:
             num_frames = ego_annotations[f'R_k_cam_np'].shape[0]-1
-            R = torch.tensor(ego_annotations[f'R_k_cam_np'][min(frame_num, num_frames)], device=self.device)
-            T = torch.tensor(ego_annotations[f'T_k_cam_np'][min(frame_num, num_frames)], device=self.device) 
+            R = torch.tensor(ego_annotations[f'R_k_cam_np'][min(frame_num, num_frames)], device=self.device, dtype=torch.float32)
+            T = torch.tensor(ego_annotations[f'T_k_cam_np'][min(frame_num, num_frames)], device=self.device, dtype=torch.float32) 
             cam_ext = torch.cat((torch.cat((R, T), dim=1), torch.tensor([[0, 0, 0, 1]], device=self.device)), dim=0).unsqueeze(0)
-            cam_int = torch.tensor(ego_annotations['intrinsics'], device=self.device)
+            cam_int = torch.tensor(ego_annotations['intrinsics'], device=self.device, dtype=torch.float32)
 
         return cam_ext, cam_int
 
@@ -146,7 +146,7 @@ class ArcticDataset(Dataset):
             obj_annotations = np.load(self.annotations.open(obj_annotations_path), allow_pickle=True)
             print('good zip file', obj_annotations_path)
         except: # Bad zip file
-            obj_annotations = np.zeros((1000, 7))
+            obj_annotations = np.zeros((1000, 7), dtype=np.float32)
             print('bad zip file', obj_annotations_path)
 
         obj_dict = {}
