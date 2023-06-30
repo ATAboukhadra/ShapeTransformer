@@ -79,6 +79,7 @@ class ArcticDataset(Dataset):
             ego_annotations = np.load(self.annotations.open(ego_annotations_path), allow_pickle=True).item()
             print(f'loaded {ego_annotations_path}')
         except:
+            ego_annotations = {}
             ego_annotations['R_k_cam_np'] = np.zeros((1000, 3, 3))
             ego_annotations['T_k_cam_np'] = np.zeros((1000, 3, 1))
             ego_annotations['intrinsics'] = np.zeros((3, 3))
