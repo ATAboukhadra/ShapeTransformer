@@ -75,7 +75,14 @@ class ArcticDataset(Dataset):
         ego_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.egocam.dist.npy')
         
         # ego_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.egocam.dist.npy')
-        ego_annotations = np.load(self.annotations.open(ego_annotations_path), allow_pickle=True).item()
+        try:
+            ego_annotations = np.load(self.annotations.open(ego_annotations_path), allow_pickle=True).item()
+            print(f'loaded {ego_annotations_path}')
+        except:
+            ego_annotations['R_k_cam_np'] = np.zeros((1000, 3, 3))
+            ego_annotations['T_k_cam_np'] = np.zeros((1000, 3, 1))
+            ego_annotations['intrinsics'] = np.zeros((3, 3))
+            print(f'bad zip file {ego_annotations_path}')
 
         if camera > 0:
             cam_ext = torch.tensor(self.meta[subject]['world2cam'][camera-1], device=self.device).unsqueeze(0)
@@ -103,6 +110,7 @@ class ArcticDataset(Dataset):
         hand_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.mano.npy')
         try:
             hand_annotations = np.load(self.annotations.open(hand_annotations_path), allow_pickle=True).item()
+            print('good zip file', hand_annotations_path)
         except: # Bad zip file
             hand_annotations = {
                 'right': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))},
@@ -133,8 +141,13 @@ class ArcticDataset(Dataset):
 
         # obj_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.object.npy')
         obj_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.object.npy')
-        obj_annotations = np.load(self.annotations.open(obj_annotations_path), allow_pickle=True)
-        
+        try:
+            obj_annotations = np.load(self.annotations.open(obj_annotations_path), allow_pickle=True)
+            print('good zip file', obj_annotations_path)
+        except: # Bad zip file
+            obj_annotations = np.zeros((1000, 7))
+            print('bad zip file', obj_annotations_path)
+
         obj_dict = {}
         num_frames = obj_annotations.shape[0] - 1
         articulation = torch.tensor(obj_annotations[min(frame_num, num_frames)][0], device=self.device)
