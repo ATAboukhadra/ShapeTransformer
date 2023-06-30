@@ -26,7 +26,7 @@ def init_hand_kp_model():
     detector = vision.HandLandmarker.create_from_options(options)
     return detector
 
-detector = init_hand_kp_model()
+# detector = init_hand_kp_model()
 
 def create_segmenter(hand=True):
     # Create the options that will be used for ImageSegmenter
@@ -38,7 +38,7 @@ def create_segmenter(hand=True):
     segmenter = vision.ImageSegmenter.create_from_options(options)
     return segmenter 
 
-hand_segmenter = create_segmenter(True)
+# hand_segmenter = create_segmenter(True)
 # obj_segmenter = create_segmenter(False)
 
 def draw_landmarks_on_image(rgb_image, detection_result):
@@ -135,7 +135,7 @@ def get_segmentation_mask(segmenter, image, class_id):
     return mask_arr
 
     
-def detect_hand(image, segment=True):
+def detect_hand(image, detector=None, segmenter=None):
 
     # Load the input image from numpy array
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image)
@@ -149,9 +149,9 @@ def detect_hand(image, segment=True):
 
     # Segment the hand from the cropped image
     cropped_image, masked_hand = None, None
-    if segment:
+    if segmenter is not None:
         cropped_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=cropped_image)
-        masked_hand = get_segmentation_mask(hand_segmenter, cropped_image, 2)
+        masked_hand = get_segmentation_mask(segmenter, cropped_image, 2)
 
     return annotated_image, pose2d, cropped_image, bb, masked_hand
 

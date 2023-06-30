@@ -15,7 +15,7 @@ from pytorch3d.io import load_obj
 from pytorch3d.transforms import axis_angle_to_quaternion, quaternion_apply
 from pytorch3d.renderer import Textures
 from torch.utils.data import DataLoader
-from models.mp_hand_segmenter import detect_hand
+from models.mp_hand_segmenter import detect_hand, init_hand_kp_model
 from torchvision import transforms
 
 class ArcticDataset(Dataset):
@@ -31,6 +31,7 @@ class ArcticDataset(Dataset):
         self.mano_layers = {'right': mano_layer_right, 'left': mano_layer_left}
         self.hand_faces = {'right': faces_right, 'left': faces_left}
 
+        self.hand_detector = init_hand_kp_model()
         self.annotations = zipfile.ZipFile(os.path.join(self.root, 'raw_seqs.zip'))
         self.meta_archive = zipfile.ZipFile(os.path.join(self.root, 'meta.zip'))
         self.meta = json.load(self.meta_archive.open('meta/misc.json'))
@@ -39,7 +40,9 @@ class ArcticDataset(Dataset):
         self.objects = {name: {} for name in os.listdir(objects_root)}
         self.load_objects()
         self.object_names = sorted(list(self.objects.keys()))
-        self.transform = transforms.Compose([transforms.ToTensor()])
+        self.transform = transforms.Compose([transforms.ToTensor(), 
+                                            #  transforms.Resize(500, antialias=True)
+                                             ])
         # self.iterable = iterable
         if not iterable: self.scan_dataset()
 
@@ -177,7 +180,7 @@ class ArcticDataset(Dataset):
         frame_num = int(frame.split('.')[0]) - 1
         obj = seq_name.split('_')[0]
         
-        _, pose2d, _, _, _ = detect_hand(img, segment=False)
+        _, pose2d, _, _, _ = detect_hand(img, detector=self.hand_detector)
 
         img = self.transform(img).to(self.device)
 

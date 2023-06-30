@@ -20,10 +20,10 @@ if not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
 logger = create_logger(args.output_folder)
 
 train_pipeline, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', torch.device('cpu'), args.window_size)
-trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, collate_fn=batch_samples)
+trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, collate_fn=batch_samples, pin_memory=True)
 
 val_pipeline, _, _ = create_pipe(args.data_root, args.meta_root, 'val', torch.device('cpu'), args.window_size, factory=factory, arctic_decoder=decoder)
-valloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, collate_fn=batch_samples)
+valloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, collate_fn=batch_samples, pin_memory=True)
 
 dataset = decoder.dataset
 hand_faces = dataset.hand_faces
