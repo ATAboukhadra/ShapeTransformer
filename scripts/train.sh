@@ -11,6 +11,6 @@ python main.py \
 --epochs 5 \
 --hdf5 \
 --window_size 21 \
---log_interval 10 \
+--log_interval 100 \
 --num_workers 0 \
 # --output_folder checkpoints/transformer
