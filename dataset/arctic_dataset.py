@@ -187,7 +187,8 @@ class ArcticDataset(Dataset):
         hand_dict = self.load_hand_annotations(subject, seq_name, frame_num, cam_ext, cam_int)
         obj_dict = self.load_obj_annotations(subject, seq_name, frame_num, cam_ext, cam_int, obj)
 
-        data_dict = hand_dict | obj_dict
+        hand_dict.update(obj_dict)
+        data_dict = hand_dict
         data_dict['img'] = img
         data_dict['key'] = key
         data_dict['hands_pose2d'] = pose2d.to(self.device)
