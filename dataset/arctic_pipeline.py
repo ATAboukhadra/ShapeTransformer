@@ -75,8 +75,9 @@ def create_pipe(in_dir, objects_root, subset, device, sliding_window_size, facto
     if factory is None: factory = SequencePipelineCreator(in_dir)
 
     # Make the shuffle buffer a multiple of the shard size. The multiplier may be chosen according to the batch size.
-    multiplier = 2
+    multiplier = 8
     shard_size = factory.get_average_shard_sample_count(subset)
+    sample_count = factory.get_sample_count(subset)
     # Make an educated guess on a good size for the shuffle buffer using the meta-data.
     shuffle_buffer_size = int(multiplier * shard_size)
     # Using the metadata created in the conversion process, the streaming pipeline can be created automatically.
@@ -84,5 +85,5 @@ def create_pipe(in_dir, objects_root, subset, device, sliding_window_size, facto
     # Decode the components of the dataset. Placing it in a function makes it reusable.
     pipe, decoder = decode_dataset(pipe, in_dir, objects_root, device, arctic_decoder)
 
-    return pipe, decoder, factory
+    return pipe, sample_count, decoder, factory
 

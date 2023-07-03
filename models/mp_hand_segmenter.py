@@ -12,6 +12,9 @@ from mediapipe.tasks.python import vision
 import cv2
 import matplotlib.pyplot as plt
 import torch
+import time
+VisionRunningMode = mp.tasks.vision.RunningMode
+
 MARGIN = 10  # pixels
 FONT_SIZE = 1
 FONT_THICKNESS = 1
@@ -21,8 +24,10 @@ def init_hand_kp_model():
     # STEP 2: Create an HandLandmarker object.
     base_options = python.BaseOptions(model_asset_path='models/hand_landmarker.task')
     options = vision.HandLandmarkerOptions(base_options=base_options,
+                                        running_mode=VisionRunningMode.VIDEO,
                                         num_hands=2,
-                                        min_hand_detection_confidence=0.01)
+                                        min_hand_detection_confidence=0.01
+                                        )
     detector = vision.HandLandmarker.create_from_options(options)
     return detector
 
@@ -141,7 +146,7 @@ def detect_hand(image, detector=None, segmenter=None):
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image)
 
     # Detect hand landmarks from the input image.
-    detection_result = detector.detect(image)
+    detection_result = detector.detect_for_video(image, mp.Timestamp.from_seconds(time.time()).value)
     annotated_image = draw_landmarks_on_image(image.numpy_view(), detection_result)
 
     # Process the classification result. 

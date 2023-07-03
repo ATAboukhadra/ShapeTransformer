@@ -265,6 +265,7 @@ def visualize_image_with_mesh(img, rendered_image):
     plt.clf()
     plt.close()
 
+L1 = torch.nn.L1Loss()
 L2 = torch.nn.MSELoss()
 CEL = torch.nn.CrossEntropyLoss()
 

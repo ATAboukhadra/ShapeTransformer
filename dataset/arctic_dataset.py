@@ -75,7 +75,6 @@ class ArcticDataset(Dataset):
 
         ego_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.egocam.dist.npy')
         
-        # ego_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.egocam.dist.npy')
         self.total += 1
         try:
             ego_annotations = np.load(self.annotations.open(ego_annotations_path), allow_pickle=True).item()
@@ -85,7 +84,6 @@ class ArcticDataset(Dataset):
             ego_annotations['T_k_cam_np'] = np.zeros((1000, 3, 1))
             ego_annotations['intrinsics'] = np.zeros((3, 3))
             self.bad += 1
-            print('bad loads', self.bad/self.total)
 
         if camera > 0:
             cam_ext = torch.tensor(self.meta[subject]['world2cam'][camera-1], device=self.device).unsqueeze(0)
@@ -116,14 +114,14 @@ class ArcticDataset(Dataset):
             hand_annotations = np.load(self.annotations.open(hand_annotations_path), allow_pickle=True).item()
         except: # Bad zip file
             hand_annotations = {
-                'right': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))},
-                'left': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))}
+                'left': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))},
+                'right': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))}
             }
             self.bad += 1
-            print('bad loads', self.bad/self.total)
 
         hand_dict = {}
-        for side in ['right', 'left']:
+        pose2d = torch.zeros((2, 21, 2), device=self.device, dtype=torch.float32)
+        for i, side in enumerate(['left', 'right']):
 
             anno = hand_annotations[side]
             hand = []
@@ -137,7 +135,11 @@ class ArcticDataset(Dataset):
                 hand_dict[f'{side}_{component}'] = comp_tensor
 
             verts, kps = self.decode_mano(torch.cat((hand[0], hand[1]), dim=1), hand[2], hand[3], side, cam_ext)
+            kps_2d = project_3D_points(cam_int, kps)
+            pose2d[i] = kps_2d[0]
             hand_dict[f'{side}_verts'] = verts[0]
+
+        hand_dict['hands_pose2d'] = pose2d
 
         return hand_dict
 
@@ -151,7 +153,6 @@ class ArcticDataset(Dataset):
         except: # Bad zip file
             obj_annotations = np.zeros((1000, 7), dtype=np.float32)
             self.bad += 1
-            print('bad loads', self.bad/self.total)
 
         obj_dict = {}
         num_frames = obj_annotations.shape[0] - 1
@@ -207,7 +208,7 @@ class ArcticDataset(Dataset):
         obj = seq_name.split('_')[0]
         
         # _, pose2d, _, _, _ = detect_hand(img, detector=self.hand_detector)
-        pose2d = torch.zeros((2, 21, 2))
+        # pose2d = torch.zeros((2, 21, 2))
         img = self.transform(img).to(self.device)
 
         cam_ext, cam_int = self.load_camera_matrix(subject, seq_name, camera_num, frame_num)
@@ -218,7 +219,7 @@ class ArcticDataset(Dataset):
         data_dict = hand_dict
         data_dict['img'] = img
         data_dict['key'] = key
-        data_dict['hands_pose2d'] = pose2d.to(self.device)
+        # data_dict['hands_pose2d'] = pose2d.to(self.device)
         data_dict['cam_ext'] = cam_ext[0]
         data_dict['cam_int'] = cam_int
 
