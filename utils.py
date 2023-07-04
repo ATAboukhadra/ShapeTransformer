@@ -271,18 +271,18 @@ CEL = torch.nn.CrossEntropyLoss()
 
 def calculate_loss(outputs, targets):
     losses = {}
-
+    w = 0.1
     for side in ['left', 'right']:
         mano_gt = targets[f'{side}_rot'], targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']
         mano_pred = outputs[f'{side}_rot'], outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']
-        loss = sum(L2(mano_gt[i], mano_pred[i]) for i in range(len(mano_gt)))
+        loss = sum(L2(mano_gt[i], mano_pred[i]) * w for i in range(len(mano_gt)))
         losses[f'{side}_mano'] = loss
 
     obj_pose, obj_class = outputs['obj_pose'], outputs['obj_class']
     obj_pred = obj_pose[:, :, :1], obj_pose[:, :, 1:4], obj_pose[:, :, 4:]
     obj_gt = targets['articulation'], targets['rot'], targets['trans']
 
-    loss = sum(L2(obj_gt[i], obj_pred[i]) for i in range(len(obj_gt)))
+    loss = sum(L2(obj_gt[i], obj_pred[i]) * w for i in range(len(obj_gt)))
 
     obj_class_loss = CEL(obj_class, targets['label'])
     loss += obj_class_loss
