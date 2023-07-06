@@ -89,7 +89,7 @@ def showHandJoints(imgInOrg, gtIn, filename=None, dataset_name='ho', mode='pred'
             color_code_num = (joint_num // 4)
             joint_color = list(map(lambda x: x + cf * (joint_num % 4), joint_color_code[color_code_num]))[::-1]    
             
-            cv2.circle(imgIn, center=(gtIn[joint_num][0], gtIn[joint_num][1]), radius=3, color=joint_color, thickness=-1)
+            cv2.circle(imgIn, center=(gtIn[joint_num][0], gtIn[joint_num][1]), radius=1, color=joint_color, thickness=-1)
         
         for limb_num in range(len(limbs)):
             x1 = gtIn[limbs[limb_num][0], 1]

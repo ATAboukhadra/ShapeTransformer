@@ -271,19 +271,17 @@ CEL = torch.nn.CrossEntropyLoss()
 
 def calculate_loss(outputs, targets):
     losses = {}
-    w = 0.1
+    w = 1.0
     for side in ['left', 'right']:
-        mano_gt = targets[f'{side}_rot'], targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']
-        mano_pred = outputs[f'{side}_rot'], outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']
+        mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']
+        mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']
         loss = sum(L2(mano_gt[i], mano_pred[i]) * w for i in range(len(mano_gt)))
         losses[f'{side}_mano'] = loss
 
-    obj_pose, obj_class = outputs['obj_pose'], outputs['obj_class']
-    obj_pred = obj_pose[:, :, :1], obj_pose[:, :, 1:4], obj_pose[:, :, 4:]
-    obj_gt = targets['articulation'], targets['rot'], targets['trans']
+    obj_pose_pred, obj_class = outputs['obj_pose'], outputs['obj_class']
+    obj_pose_gt = targets['obj_pose']
 
-    loss = sum(L2(obj_gt[i], obj_pred[i]) * w for i in range(len(obj_gt)))
-
+    loss = L2(obj_pose_gt, obj_pose_pred) * w 
     obj_class_loss = CEL(obj_class, targets['label'])
     loss += obj_class_loss
     losses['obj'] = loss
@@ -295,22 +293,22 @@ def calculate_loss(outputs, targets):
 def calculate_error(outputs, targets, errors, dataset, target_idx, model):
 
     # Calculate hand mesh error
-    bs, t = targets[f'left_rot'].shape[:2]
+    bs, t = targets[f'left_pose'].shape[:2]
     cam_ext = targets['cam_ext'].unsqueeze(1).view(bs * t, 4, 4)
 
     for side in ['left', 'right']:
-        mano_gt = [targets[f'{side}_rot'], targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']]
-        mano_pred = [outputs[f'{side}_rot'], outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']]
+        mano_gt = [targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']]
+        mano_pred = [outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']]
 
-        mano_gt[2] = mano_gt[2].unsqueeze(1).repeat(1, t, 1)
-        mano_pred[2] = mano_pred[2].unsqueeze(1).repeat(1, t, 1)
+        mano_gt[1] = mano_gt[1].unsqueeze(1).repeat(1, t, 1)
+        mano_pred[1] = mano_pred[1].unsqueeze(1).repeat(1, t, 1)
 
         for i in range(len(mano_gt)):
             mano_gt[i] = mano_gt[i].view(bs * t, mano_gt[i].shape[-1])
             mano_pred[i] = mano_pred[i].view(bs * t, mano_pred[i].shape[-1])
 
-        mesh_gt, pose_gt = model.decode_mano(torch.cat((mano_gt[0], mano_gt[1]), dim=1), mano_gt[2], mano_gt[3], side, cam_ext)
-        mesh_pred, pose_pred = model.decode_mano(torch.cat((mano_pred[0], mano_pred[1]), dim=1), mano_pred[2], mano_pred[3], side, cam_ext)
+        mesh_gt, pose_gt = model.decode_mano(mano_gt[0], mano_gt[1], mano_gt[2], side, cam_ext)
+        mesh_pred, pose_pred = model.decode_mano(mano_gt[0], mano_pred[1], mano_pred[2], side, cam_ext)
 
         # Calculate hand mesh error for only the middle frame or the last frame
         mesh_err = mpjpe(mesh_pred[target_idx], mesh_gt[target_idx]) * 1000
@@ -328,7 +326,8 @@ def calculate_error(outputs, targets, errors, dataset, target_idx, model):
 
     # Calculate object mesh error
     obj_pred = obj_pose[:, :, :1], obj_pose[:, :, 1:4], obj_pose[:, :, 4:]
-    obj_gt = targets['articulation'], targets['rot'], targets['trans']
+    obj_pose_gt = targets['obj_pose']
+    obj_gt = obj_pose_gt[:, :, :1], obj_pose_gt[:, :, 1:4], obj_pose_gt[:, :, 4:]
     
     object_names = [dataset.object_names[l] for l in targets['label']]
 

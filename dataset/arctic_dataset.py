@@ -4,6 +4,7 @@ import numpy as np
 import torch
 import cv2
 import zipfile
+import time
 
 from torch.utils.data import Dataset
 from manopth.manolayer import ManoLayer
@@ -40,9 +41,9 @@ class ArcticDataset(Dataset):
         self.objects = {name: {} for name in os.listdir(objects_root)}
         self.load_objects()
         self.object_names = sorted(list(self.objects.keys()))
-        self.transform = transforms.Compose([transforms.ToTensor(), 
-                                            #  transforms.Resize(500, antialias=True)
-                                             ])
+        # self.transform = transforms.Compose([transforms.ToTensor(), 
+        #                                     #  transforms.Resize(500, antialias=True)
+        #                                      ])
         # self.iterable = iterable
         self.total, self.bad = 0, 0
         if not iterable: self.scan_dataset()
@@ -72,7 +73,7 @@ class ArcticDataset(Dataset):
         return len(self.dataset_keys)
 
     def load_camera_matrix(self, subject, seq_name, camera, frame_num):
-
+        t1 = time.time()
         ego_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.egocam.dist.npy')
         
         self.total += 1
@@ -94,7 +95,6 @@ class ArcticDataset(Dataset):
             T = torch.tensor(ego_annotations[f'T_k_cam_np'][min(frame_num, num_frames)], device=self.device, dtype=torch.float32) 
             cam_ext = torch.cat((torch.cat((R, T), dim=1), torch.tensor([[0, 0, 0, 1]], device=self.device)), dim=0).unsqueeze(0)
             cam_int = torch.tensor(ego_annotations['intrinsics'], device=self.device, dtype=torch.float32)
-
         return cam_ext, cam_int
 
     def decode_mano(self, pose, shape, trans, side, cam_ext):
@@ -106,7 +106,7 @@ class ArcticDataset(Dataset):
         return verts_cam, kps_cam
             
     def load_hand_annotations(self, subject, seq_name, frame_num, cam_ext, cam_int):
-
+        # t1 = time.time()
         # hand_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.mano.npy')
         hand_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.mano.npy')
         self.total += 1
@@ -131,20 +131,25 @@ class ArcticDataset(Dataset):
                     comp_tensor = torch.tensor(anno_comp[min(frame_num, anno_comp.shape[0]-1)], dtype=torch.float32, device=self.device)
                 else:
                     comp_tensor = torch.tensor(anno[component], dtype=torch.float32, device=self.device)
-                hand.append(comp_tensor.unsqueeze(0))
-                hand_dict[f'{side}_{component}'] = comp_tensor
+                hand.append(comp_tensor)#.unsqueeze(0))
 
-            verts, kps = self.decode_mano(torch.cat((hand[0], hand[1]), dim=1), hand[2], hand[3], side, cam_ext)
+            hand_dict[f'{side}_pose'] = torch.cat((hand[0], hand[1]), dim=0)
+            hand_dict[f'{side}_shape'] = hand[2]
+            hand_dict[f'{side}_trans'] = hand[3]
+
+            # print(hand_dict[f'{side}_mano'].shape)
+            verts, kps = self.decode_mano(hand_dict[f'{side}_pose'].unsqueeze(0), hand[2].unsqueeze(0), hand[3].unsqueeze(0), side, cam_ext)
             kps_2d = project_3D_points(cam_int, kps)
             pose2d[i] = kps_2d[0]
-            hand_dict[f'{side}_verts'] = verts[0]
+            # hand_dict[f'{side}_verts'] = verts[0]
 
         hand_dict['hands_pose2d'] = pose2d
+        # print(f'load_hand_annotations: {time.time()-t1}')
 
         return hand_dict
 
     def load_obj_annotations(self, subject, seq_name, frame_num, cam_ext, cam_int, obj):
-
+        t1 = time.time()
         # obj_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.object.npy')
         obj_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.object.npy')
         self.total += 1
@@ -156,16 +161,10 @@ class ArcticDataset(Dataset):
 
         obj_dict = {}
         num_frames = obj_annotations.shape[0] - 1
-        articulation = torch.tensor(obj_annotations[min(frame_num, num_frames)][0], device=self.device)
-        rot = torch.tensor(obj_annotations[min(frame_num, num_frames)][1:4], device=self.device)
-        trans = torch.tensor(obj_annotations[min(frame_num, num_frames)][4:7], device=self.device)
-
-        obj_dict['articulation'] = articulation.unsqueeze(0)
-        obj_dict['rot'] = rot
-        obj_dict['trans'] = trans / 1000
+        obj_pose = torch.tensor(obj_annotations[min(frame_num, num_frames)], device=self.device)
+        obj_dict['obj_pose'] = obj_pose
         obj_dict['object_name'] = obj
         obj_dict['label'] = torch.tensor(self.object_names.index(obj), dtype=torch.long, device=self.device)
-
         return obj_dict
 
     def transform_obj(self, obj, articulation, rot, trans, cam_ext):
@@ -209,8 +208,6 @@ class ArcticDataset(Dataset):
         
         # _, pose2d, _, _, _ = detect_hand(img, detector=self.hand_detector)
         # pose2d = torch.zeros((2, 21, 2))
-        img = self.transform(img).to(self.device)
-
         cam_ext, cam_int = self.load_camera_matrix(subject, seq_name, camera_num, frame_num)
         hand_dict = self.load_hand_annotations(subject, seq_name, frame_num, cam_ext, cam_int)
         obj_dict = self.load_obj_annotations(subject, seq_name, frame_num, cam_ext, cam_int, obj)
@@ -222,7 +219,6 @@ class ArcticDataset(Dataset):
         # data_dict['hands_pose2d'] = pose2d.to(self.device)
         data_dict['cam_ext'] = cam_ext[0]
         data_dict['cam_int'] = cam_int
-
         return data_dict
 
     def __getitem__(self, idx):

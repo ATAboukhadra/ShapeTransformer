@@ -46,6 +46,8 @@ for e in range(args.epochs):
     errors = {k: AverageMeter() for k in keys}
     for i, data_dict in tqdm(enumerate(trainloader), total=train_count // args.batch_size):
 
+        data_dict['img'] = [torch.stack(img_batch, dim=0).to(device) for img_batch in data_dict['img']]
+
         for k in data_dict.keys():
             data_dict[k] = data_dict[k].to(device) if isinstance(data_dict[k], torch.Tensor) else data_dict[k]
 
@@ -59,7 +61,7 @@ for e in range(args.epochs):
 
         if (i+1) % args.log_interval == 0:
             error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
-            logger.info(f'[{i+1} / {train_count // args.batch_size}]: {error_list}')
+            logger.info(f'\n[{i+1} / {train_count // args.batch_size}]: {error_list}')
             errors = {k: AverageMeter() for k in keys}
 
     torch.save(model.state_dict(), f'{args.output_folder}/model_{e}.pth')

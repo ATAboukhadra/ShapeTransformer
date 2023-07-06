@@ -13,6 +13,8 @@ import torch
 import numpy as np
 from torch.utils.data.datapipes.datapipe import DataChunk
 from dataset.arctic_dataset import ArcticDataset
+import time 
+from torchvision.transforms.functional import resize
 
 class ArcticDecoder():
     def __init__(self, root, objects_root, device):
@@ -32,21 +34,21 @@ class ArcticDecoder():
 
     def __call__(self, sample: DataChunk):
         seq_samples = [self.decode_sample(s) for s in sample]
-
         non_changing_keys = ['left_shape', 'right_shape', 'object_name', 'label', 'cam_int']
-        temporal_sample = batch_samples(seq_samples, non_changing_keys=non_changing_keys, rigged_rgb=False)
+        temporal_sample = batch_samples(seq_samples, non_changing_keys=non_changing_keys)
         
         return temporal_sample
 
-def batch_samples(samples, non_changing_keys=None, rigged_rgb=True):
-    # Concatenate the tensors for each key across all dictionaries
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
+def batch_samples(samples, non_changing_keys=None):
+    # Concatenate the tensors for each key across all dictionaries
     keys = list(samples[0].keys())
     samples_dict = {}
     for key in keys:
         if non_changing_keys is not None and key in non_changing_keys:
             samples_dict[key] = samples[0][key]
-        elif rigged_rgb and key == 'img':
+        elif key == 'img':
             samples_dict[key] = [s[key] for s in samples]
         elif isinstance(samples[0][key], torch.Tensor):
             samples_dict[key] = torch.cat([s[key].unsqueeze(0) for s in samples], dim=0)
@@ -54,19 +56,23 @@ def batch_samples(samples, non_changing_keys=None, rigged_rgb=True):
             samples_dict[key] = torch.cat([torch.tensor(s[key]).unsqueeze(0) for s in samples], dim=0)
         else:
             samples_dict[key] = [d[key] for d in samples]
-
     return samples_dict
 
+def resize_sample(sample):
+    resized_img = resize(sample[0][1], 500, antialias=True)
+    new_sample = [(sample[0][0], resized_img)]
+    return new_sample
 
 def decode_dataset(pipe: IterDataPipe, root, objects_root, device, arctic_decoder=None):
     """ Decodes the components of the dataset "dataset". """
     # TODO map components to decoding functions
-    decoder_map = {"rgb": ImageDecoder('rgb8')}
+    decoder_map = {"rgb": ImageDecoder('torch')}
     # apply the decoding functions to each sample
     pipe = pipe.map(fn=Decoder(decoder_map))
-    arctic_decoder = ArcticDecoder(root, objects_root, device) if arctic_decoder is None else arctic_decoder
-    pipe = pipe.map(fn=arctic_decoder)
-    return pipe, arctic_decoder
+    pipe = pipe.map(fn=resize_sample)
+    # arctic_decoder = ArcticDecoder(root, objects_root, device) if arctic_decoder is None else arctic_decoder
+    # pipe = pipe.map(fn=arctic_decoder)
+    return pipe
 
 
 def create_pipe(in_dir, objects_root, subset, device, sliding_window_size, factory=None, arctic_decoder=None):
@@ -75,15 +81,22 @@ def create_pipe(in_dir, objects_root, subset, device, sliding_window_size, facto
     if factory is None: factory = SequencePipelineCreator(in_dir)
 
     # Make the shuffle buffer a multiple of the shard size. The multiplier may be chosen according to the batch size.
-    multiplier = 8
-    shard_size = factory.get_average_shard_sample_count(subset)
+    # multiplier = 1
+    # shard_size = factory.get_average_shard_sample_count(subset)
     sample_count = factory.get_sample_count(subset)
     # Make an educated guess on a good size for the shuffle buffer using the meta-data.
-    shuffle_buffer_size = int(multiplier * shard_size)
+    # shuffle_buffer_size = int(multiplier * shard_size)
+    
+    shuffle_buffer_size = 1 # This is now the number of sequences in the buffer
+
     # Using the metadata created in the conversion process, the streaming pipeline can be created automatically.
     pipe = factory.create_datapipe(subset, shuffle_buffer_size, shuffle_shards=subset == "train", temporal_sliding_window_size=sliding_window_size)
     # Decode the components of the dataset. Placing it in a function makes it reusable.
-    pipe, decoder = decode_dataset(pipe, in_dir, objects_root, device, arctic_decoder)
+    pipe = decode_dataset(pipe, in_dir, objects_root, device, arctic_decoder)
+    pipe = factory.add_temporal_windowing_and_shuffling(pipe)
+    arctic_decoder = ArcticDecoder(in_dir, objects_root, device) if arctic_decoder is None else arctic_decoder
+    pipe = pipe.map(fn=arctic_decoder)
 
-    return pipe, sample_count, decoder, factory
+    # pipe.map(fn=batch_samples)
+    return pipe, sample_count, arctic_decoder, factory
 

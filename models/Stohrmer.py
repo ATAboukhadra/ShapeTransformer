@@ -20,7 +20,7 @@ class Stohrmer(nn.Module):
         self.spatial_encoder = GraFormer(num_pts=num_kps, coords_dim=(2, spatial_dim))
         num_features = spatial_dim * num_kps + 512
 
-        self.resize = transforms.Resize(500, antialias=True)
+        # self.resize = transforms.Resize(500, antialias=True)
         weights = ResNet18_Weights.DEFAULT
         full_resnet18 = resnet18(weights=weights, progress=False)
         self.resnet18 = torch.nn.Sequential(*list(full_resnet18.children())[:-1])
@@ -50,7 +50,7 @@ class Stohrmer(nn.Module):
         img_list = batch_dict['img']
         features_list = []
         for img_batch in img_list:
-            img_batch = self.resize(img_batch.to(self.device))
+            # img_batch = self.resize(img_batch)
             features = self.resnet18(img_batch).squeeze(-1).squeeze(-1)
             features_list.append(features)
 
@@ -60,8 +60,8 @@ class Stohrmer(nn.Module):
         features_tensor = torch.cat([features_tensor, spatial_pose_features], dim=-1)
         frame_outputs = self.temporal_encoder(features_tensor)
 
-        left_mano_rot, left_mano_pose, left_mano_trans = frame_outputs[:, :, :3], frame_outputs[:, :, 3:48], frame_outputs[:, :, 48:51]
-        right_mano_rot, right_mano_pose, right_mano_trans = frame_outputs[:, :, 51:54], frame_outputs[:, :, 54:99], frame_outputs[:, :, 99:102]        
+        left_mano_pose, left_mano_trans = frame_outputs[:, :, :48], frame_outputs[:, :, 48:51]
+        right_mano_pose, right_mano_trans = frame_outputs[:, :, 51:99], frame_outputs[:, :, 99:102]        
         obj_pose = frame_outputs[:, :, 102:109]
 
         # Output
@@ -70,11 +70,9 @@ class Stohrmer(nn.Module):
         left_mano_shape, right_mano_shape, obj_class = outputs[:, :10], outputs[:, 10:20], outputs[:, 20:]
 
         outputs_dict = {
-            'left_rot': left_mano_rot,
             'left_pose': left_mano_pose,
             'left_shape': left_mano_shape,
             'left_trans': left_mano_trans,
-            'right_rot': right_mano_rot,
             'right_pose': right_mano_pose,
             'right_shape': right_mano_shape,
             'right_trans': right_mano_trans,

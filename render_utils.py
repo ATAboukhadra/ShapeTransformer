@@ -91,9 +91,9 @@ def render_arctic_mesh(verts, faces, textures, renderer, bn=1):
         verts_renderer[:, :, 0] *= -1
         verts_renderer[:, :, 1] *= -1
         if textures[i] is None:
-            meshes.append(create_mesh(verts_renderer, faces[i].repeat(bn, 1, 1), color=colors[i]))
+            meshes.append(create_mesh(verts_renderer, faces[i].repeat(bn, 1, 1).to(verts_renderer.device), color=colors[i]))
         else:
-            meshes.append(create_mesh(verts_renderer, faces[i].repeat(bn, 1, 1), tex=textures[i]))
+            meshes.append(create_mesh(verts_renderer, faces[i].repeat(bn, 1, 1).to(verts_renderer.device), tex=textures[i].to(verts_renderer.device)))
             
     meshes = join_meshes_as_scene(meshes)
 
