@@ -6,6 +6,7 @@ from vis_utils import showHandJoints
 from dataset.arctic_pipeline import create_pipe, batch_samples
 from tqdm import tqdm
 from torchvision.transforms.functional import resize
+from utils import project_3D_points
 
 np.set_printoptions(precision=2)
 
@@ -17,7 +18,7 @@ root = '/ds-av/public_datasets/arctic/td_p1_sequential_nocropped/'
 objects_root = 'dataset/arctic_objects'
 batch_size = 1
 num_workers = 1
-sliding_window_size = 9
+sliding_window_size = 3
 scale_factor = 4
 
 train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', 'cpu', sliding_window_size)
@@ -32,7 +33,7 @@ hand_faces = dataset.hand_faces
 
 for i, data_dict in tqdm(enumerate(trainloader), total=num_samples // batch_size):
     articulation = data_dict['obj_pose'][0][0][0]
-    if articulation < 0.1 or data_dict['img'][0][0].shape[-2:][0] == 700:
+    if i < 100 or articulation < 0.1: # or data_dict['img'][0][0].shape[-2:][0] == 700:
         continue
     
     data_dict['img'] = [torch.stack(img_batch, dim=0).to(device) for img_batch in data_dict['img']]
@@ -41,7 +42,8 @@ for i, data_dict in tqdm(enumerate(trainloader), total=num_samples // batch_size
     fx, fy, cx, cy = cam_int[0, 0] / scale_factor, cam_int[1, 1] / scale_factor, cam_int[0, 2] / scale_factor, cam_int[1, 2] / scale_factor
     K = torch.tensor([[[fx, 0, cx, 0], [0, fy, cy, 0], [0, 0, 0, 1], [0, 0, 1, 0]]], device=device)
     image_sizes = ((data_dict['img'][0][0].shape[-2:]), )
-    fig_dim = (3, 3) if image_sizes[0][0] != 700 else (1, 9)
+    # fig_dim = (3, 3) if image_sizes[0][0] != 700 else (1, 9)
+    fig_dim = (1, 3)
     renderer = create_renderer(K, device, image_size=image_sizes)
 
     # Plot 2D hand pose
@@ -52,8 +54,10 @@ for i, data_dict in tqdm(enumerate(trainloader), total=num_samples // batch_size
 
     object_name = data_dict['object_name'][0]
     cam_ext = data_dict['cam_ext'][0]
-    obj_verts = dataset.transform_obj(object_name, articulation, rot, trans, cam_ext)
+    obj_verts, obj_kps = dataset.transform_obj(object_name, articulation, rot, trans, cam_ext)
 
+    obj_kps2d = project_3D_points(cam_int, obj_kps.view(-1, 300, 3)).view(2, sliding_window_size, -1, 2).cpu().numpy() / scale_factor
+    
     for i in tqdm(range(data_dict['img'][0].shape[0])):
         img = data_dict['img'][0][i].cpu().numpy().transpose(1, 2, 0)
         img = np.ascontiguousarray(img * 255, np.uint8)
@@ -63,6 +67,8 @@ for i, data_dict in tqdm(enumerate(trainloader), total=num_samples // batch_size
                 img = showHandJoints(img, hand.cpu().numpy() / scale_factor)
         plt.subplot(*fig_dim, i+1)
         plt.imshow(img)
+        plt.scatter(obj_kps2d[0, i, :, 0], obj_kps2d[0, i, :, 1], c='peachpuff', s=1)
+        plt.scatter(obj_kps2d[1, i, :, 0], obj_kps2d[1, i, :, 1], c='lightblue', s=1)
 
         verts_list, faces_list, textures_list = [], [], []
     
@@ -81,8 +87,8 @@ for i, data_dict in tqdm(enumerate(trainloader), total=num_samples // batch_size
             faces_list.append(faces)
             textures_list.append(texture)        
 
-        rendered_image, _ = render_arctic_mesh(verts_list, faces_list, textures_list, renderer)
-        plt.imshow(rendered_image[0].cpu().numpy())
+        # rendered_image, _ = render_arctic_mesh(verts_list, faces_list, textures_list, renderer)
+        # plt.imshow(rendered_image[0].cpu().numpy())
         plt.axis('off')
     plt.show()
 

@@ -45,7 +45,8 @@ for e in range(args.epochs):
 
     errors = {k: AverageMeter() for k in keys}
     for i, data_dict in tqdm(enumerate(trainloader), total=train_count // args.batch_size):
-
+        if data_dict is None: continue
+        
         data_dict['img'] = [torch.stack(img_batch, dim=0).to(device) for img_batch in data_dict['img']]
 
         for k in data_dict.keys():

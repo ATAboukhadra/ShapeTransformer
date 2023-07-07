@@ -35,27 +35,38 @@ class ArcticDecoder():
     def __call__(self, sample: DataChunk):
         seq_samples = [self.decode_sample(s) for s in sample]
         non_changing_keys = ['left_shape', 'right_shape', 'object_name', 'label', 'cam_int']
-        temporal_sample = batch_samples(seq_samples, non_changing_keys=non_changing_keys)
+        temporal_sample = batch_samples(seq_samples, non_changing_keys=non_changing_keys, temporal=True)
         
         return temporal_sample
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
-def batch_samples(samples, non_changing_keys=None):
+def batch_samples(samples, non_changing_keys=None, temporal=False):
     # Concatenate the tensors for each key across all dictionaries
     keys = list(samples[0].keys())
     samples_dict = {}
+    valid_samples = [s for s in samples if s['valid'] == 1] if not temporal else samples
+    
+    if len(valid_samples) < len(samples):
+        print(len(valid_samples), flush=True)
+    
+    if len(valid_samples) == 0:
+        return None
+
+
     for key in keys:
         if non_changing_keys is not None and key in non_changing_keys:
-            samples_dict[key] = samples[0][key]
+            samples_dict[key] = valid_samples[0][key]
         elif key == 'img':
-            samples_dict[key] = [s[key] for s in samples]
-        elif isinstance(samples[0][key], torch.Tensor):
-            samples_dict[key] = torch.cat([s[key].unsqueeze(0) for s in samples], dim=0)
-        elif isinstance(samples[0][key], np.ndarray):
-            samples_dict[key] = torch.cat([torch.tensor(s[key]).unsqueeze(0) for s in samples], dim=0)
+            samples_dict[key] = [s[key] for s in valid_samples]
+        elif key == 'valid':
+            samples_dict[key] = valid_samples[0][key]
+        elif isinstance(valid_samples[0][key], torch.Tensor):
+            samples_dict[key] = torch.cat([s[key].unsqueeze(0) for s in valid_samples], dim=0)
+        elif isinstance(valid_samples[0][key], np.ndarray):
+            samples_dict[key] = torch.cat([torch.tensor(s[key]).unsqueeze(0) for s in valid_samples], dim=0)
         else:
-            samples_dict[key] = [d[key] for d in samples]
+            samples_dict[key] = [d[key] for d in valid_samples]
     return samples_dict
 
 def resize_sample(sample):
@@ -87,7 +98,7 @@ def create_pipe(in_dir, objects_root, subset, device, sliding_window_size, facto
     # Make an educated guess on a good size for the shuffle buffer using the meta-data.
     # shuffle_buffer_size = int(multiplier * shard_size)
     
-    shuffle_buffer_size = 5 # This is now the number of sequences in the buffer
+    shuffle_buffer_size = 3 # This is now the number of sequences in the buffer
 
     # Using the metadata created in the conversion process, the streaming pipeline can be created automatically.
     pipe = factory.create_datapipe(subset, shuffle_buffer_size, shuffle_shards=subset == "train", temporal_sliding_window_size=sliding_window_size)
@@ -99,4 +110,3 @@ def create_pipe(in_dir, objects_root, subset, device, sliding_window_size, facto
 
     # pipe.map(fn=batch_samples)
     return pipe, sample_count, arctic_decoder, factory
-

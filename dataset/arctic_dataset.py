@@ -39,6 +39,7 @@ class ArcticDataset(Dataset):
         self.objects_root = objects_root
         self.device = device
         self.objects = {name: {} for name in os.listdir(objects_root)}
+        self.object_keypoints = {name: {} for name in os.listdir(objects_root)}
         self.load_objects()
         self.object_names = sorted(list(self.objects.keys()))
         # self.transform = transforms.Compose([transforms.ToTensor(), 
@@ -68,15 +69,18 @@ class ArcticDataset(Dataset):
                 verts, faces, aux = load_obj(os.path.join(self.objects_root, obj, f'{part}.obj'), device=self.device)
                 tex = self.create_texture(faces, aux)
                 self.objects[obj][part] = (verts, faces, tex)
+                keypoints = torch.tensor(json.load(open(os.path.join(self.objects_root, obj, f'{part}_keypoints_300.json')))['keypoints'])
+                self.object_keypoints[obj][part] = keypoints
+
 
     def __len__(self):
         return len(self.dataset_keys)
 
     def load_camera_matrix(self, subject, seq_name, camera, frame_num):
-        t1 = time.time()
         ego_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.egocam.dist.npy')
         
         self.total += 1
+        valid = True
         try:
             ego_annotations = np.load(self.annotations.open(ego_annotations_path), allow_pickle=True).item()
         except:
@@ -85,6 +89,7 @@ class ArcticDataset(Dataset):
             ego_annotations['T_k_cam_np'] = np.zeros((1000, 3, 1))
             ego_annotations['intrinsics'] = np.zeros((3, 3))
             self.bad += 1
+            valid = False
 
         if camera > 0:
             cam_ext = torch.tensor(self.meta[subject]['world2cam'][camera-1], device=self.device).unsqueeze(0)
@@ -95,7 +100,7 @@ class ArcticDataset(Dataset):
             T = torch.tensor(ego_annotations[f'T_k_cam_np'][min(frame_num, num_frames)], device=self.device, dtype=torch.float32) 
             cam_ext = torch.cat((torch.cat((R, T), dim=1), torch.tensor([[0, 0, 0, 1]], device=self.device)), dim=0).unsqueeze(0)
             cam_int = torch.tensor(ego_annotations['intrinsics'], device=self.device, dtype=torch.float32)
-        return cam_ext, cam_int
+        return cam_ext, cam_int, valid
 
     def decode_mano(self, pose, shape, trans, side, cam_ext):
         verts_world, kps_world = self.mano_layers[side](pose, shape, trans)
@@ -110,16 +115,20 @@ class ArcticDataset(Dataset):
         # hand_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.mano.npy')
         hand_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.mano.npy')
         self.total += 1
+        hand_dict = {}
+        valid = True
         try:
             hand_annotations = np.load(self.annotations.open(hand_annotations_path), allow_pickle=True).item()
+
         except: # Bad zip file
             hand_annotations = {
                 'left': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))},
                 'right': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))}
             }
             self.bad += 1
+            valid = False
 
-        hand_dict = {}
+
         pose2d = torch.zeros((2, 21, 2), device=self.device, dtype=torch.float32)
         for i, side in enumerate(['left', 'right']):
 
@@ -146,48 +155,62 @@ class ArcticDataset(Dataset):
         hand_dict['hands_pose2d'] = pose2d
         # print(f'load_hand_annotations: {time.time()-t1}')
 
-        return hand_dict
+        return hand_dict, valid
 
     def load_obj_annotations(self, subject, seq_name, frame_num, cam_ext, cam_int, obj):
-        t1 = time.time()
         # obj_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.object.npy')
         obj_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.object.npy')
         self.total += 1
+        obj_dict = {}
+        valid = True
         try:
             obj_annotations = np.load(self.annotations.open(obj_annotations_path), allow_pickle=True)
+
         except: # Bad zip file
             obj_annotations = np.zeros((1000, 7), dtype=np.float32)
             self.bad += 1
+            valid = False
 
-        obj_dict = {}
         num_frames = obj_annotations.shape[0] - 1
         obj_pose = torch.tensor(obj_annotations[min(frame_num, num_frames)], device=self.device)
         obj_dict['obj_pose'] = obj_pose
         obj_dict['object_name'] = obj
         obj_dict['label'] = torch.tensor(self.object_names.index(obj), dtype=torch.long, device=self.device)
-        return obj_dict
+        return obj_dict, valid
+
+    def transform_points(self, points, cam_ext, part, quat_arti, quat_global, trans):
+        num_verts = points.shape[1]
+        quat_arti_mesh, quat_global_mesh = quat_arti.repeat(1, num_verts, 1), quat_global.repeat(1, num_verts, 1)
+        points = quaternion_apply(quat_arti_mesh, points) if part == 'top' else points
+        points = quaternion_apply(quat_global_mesh, points) 
+        trans_mesh = trans.unsqueeze(1).repeat(1, num_verts, 1) * 1000
+        points += trans_mesh 
+        points /= 1000
+
+        points = transform_points_batch(cam_ext, points)
+        return points
 
     def transform_obj(self, obj, articulation, rot, trans, cam_ext):
         obj_verts = {}
+
         z_axis = torch.FloatTensor(np.array([0, 0, -1])).view(1, 3).to(articulation.device)
         quat_arti = axis_angle_to_quaternion(z_axis * articulation).unsqueeze(1)
         quat_global = axis_angle_to_quaternion(rot).unsqueeze(1)
 
         bs = rot.shape[0]
-        for part in ['top', 'bottom']:
+        obj_kps = torch.zeros((2, bs, 300, 3), device=self.device, dtype=torch.float32)
+        
+        for i, part in enumerate(['top', 'bottom']):
             verts = self.objects[obj][part][0].unsqueeze(0).repeat(bs, 1, 1).to(articulation.device)#.unsqueeze(0)
-            num_verts = verts.shape[1]
-            quat_arti_mesh, quat_global_mesh = quat_arti.repeat(1, num_verts, 1), quat_global.repeat(1, num_verts, 1)
-            verts = quaternion_apply(quat_arti_mesh, verts) if part == 'top' else verts
-            verts = quaternion_apply(quat_global_mesh, verts) 
-            trans_mesh = trans.unsqueeze(1).repeat(1, num_verts, 1) * 1000
-            verts += trans_mesh 
-            verts /= 1000
+            kps = self.object_keypoints[obj][part].unsqueeze(0).repeat(bs, 1, 1).to(articulation.device)#.unsqueeze(0)
+            
+            verts_cam = self.transform_points(verts, cam_ext, part, quat_arti, quat_global, trans)
+            kps_cam = self.transform_points(kps, cam_ext, part, quat_arti, quat_global, trans)
 
-            verts_cam = transform_points_batch(cam_ext, verts)
             obj_verts[part] = verts_cam
+            obj_kps[i] = kps_cam
 
-        return obj_verts
+        return obj_verts, obj_kps
 
     def create_texture(self, faces, aux):
         verts_uvs = aux.verts_uvs[None, ...]  # (1, V, 2)
@@ -208,12 +231,13 @@ class ArcticDataset(Dataset):
         
         # _, pose2d, _, _, _ = detect_hand(img, detector=self.hand_detector)
         # pose2d = torch.zeros((2, 21, 2))
-        cam_ext, cam_int = self.load_camera_matrix(subject, seq_name, camera_num, frame_num)
-        hand_dict = self.load_hand_annotations(subject, seq_name, frame_num, cam_ext, cam_int)
-        obj_dict = self.load_obj_annotations(subject, seq_name, frame_num, cam_ext, cam_int, obj)
+        cam_ext, cam_int, valid_hand = self.load_camera_matrix(subject, seq_name, camera_num, frame_num)
+        hand_dict, valid_cam = self.load_hand_annotations(subject, seq_name, frame_num, cam_ext, cam_int)
+        obj_dict, valid_obj = self.load_obj_annotations(subject, seq_name, frame_num, cam_ext, cam_int, obj)
 
         hand_dict.update(obj_dict)
         data_dict = hand_dict
+        data_dict['valid'] = valid_hand and valid_cam and valid_obj
         data_dict['img'] = img
         data_dict['key'] = key
         # data_dict['hands_pose2d'] = pose2d.to(self.device)
