@@ -47,8 +47,8 @@ def batch_samples(samples, non_changing_keys=None, temporal=False):
     samples_dict = {}
     valid_samples = [s for s in samples if s['valid'] == 1] if not temporal else samples
     
-    if len(valid_samples) < len(samples):
-        print(len(valid_samples), flush=True)
+    # if len(valid_samples) < len(samples):
+    #     print(len(valid_samples), flush=True)
     
     if len(valid_samples) == 0:
         return None
