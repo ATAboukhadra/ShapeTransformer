@@ -24,8 +24,9 @@ class Stohrmer(nn.Module):
         weights = ResNet18_Weights.DEFAULT
         full_resnet18 = resnet18(weights=weights, progress=False)
         self.resnet18 = torch.nn.Sequential(*list(full_resnet18.children())[:-1])
-        
-        frame_output_dim = 3 * 2 + 45 * 2 + 3 * 2 + 7 + extra_features # 48 MANO Pose, 3 Translation, 7 Object Pose, additional per-frame features
+
+        # 48 MANO Pose, 3 Translation, 7 Object Pose, additional per-frame features, 21 3D KPs
+        frame_output_dim = 3 * 2 + 45 * 2 + 3 * 2 + 7 + extra_features + 2 * 21 * 3 
         self.temporal_encoder = GraFormer(hid_dim=temporal_dim, coords_dim=(num_features, frame_output_dim), num_pts=num_frames, temporal=True)
 
         output_dim = 10 * 2 + 11 # 10 MANO Shape, 11 Object Classes
@@ -63,9 +64,12 @@ class Stohrmer(nn.Module):
         left_mano_pose, left_mano_trans = frame_outputs[:, :, :48], frame_outputs[:, :, 48:51]
         right_mano_pose, right_mano_trans = frame_outputs[:, :, 51:99], frame_outputs[:, :, 99:102]        
         obj_pose = frame_outputs[:, :, 102:109]
-
+        left_pose3d, right_pose3d = frame_outputs[:, :, 109:109+21*3], frame_outputs[:, :, 109+21*3:109+21*3*2]
+        
+        left_pose3d = left_pose3d.view(bs, t, 21, 3)
+        right_pose3d = right_pose3d.view(bs, t, 21, 3)
         # Output
-        final_features = frame_outputs[:, :, 109:].reshape(bs, -1)
+        final_features = frame_outputs[:, :, 109+21*3*2:].reshape(bs, -1)
         outputs = self.output(final_features)
         left_mano_shape, right_mano_shape, obj_class = outputs[:, :10], outputs[:, 10:20], outputs[:, 20:]
 
@@ -73,9 +77,11 @@ class Stohrmer(nn.Module):
             'left_pose': left_mano_pose,
             'left_shape': left_mano_shape,
             'left_trans': left_mano_trans,
+            'left_pose3d': left_pose3d,
             'right_pose': right_mano_pose,
             'right_shape': right_mano_shape,
             'right_trans': right_mano_trans,
+            'right_pose3d': right_pose3d,
             'obj_pose': obj_pose,
             'obj_class': obj_class
 

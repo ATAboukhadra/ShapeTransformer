@@ -150,7 +150,7 @@ class ArcticDataset(Dataset):
             verts, kps = self.decode_mano(hand_dict[f'{side}_pose'].unsqueeze(0), hand[2].unsqueeze(0), hand[3].unsqueeze(0), side, cam_ext)
             kps_2d = project_3D_points(cam_int, kps)
             pose2d[i] = kps_2d[0]
-            # hand_dict[f'{side}_verts'] = verts[0]
+            hand_dict[f'{side}_pose3d'] = kps[0]
 
         hand_dict['hands_pose2d'] = pose2d
         # print(f'load_hand_annotations: {time.time()-t1}')

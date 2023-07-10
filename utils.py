@@ -271,8 +271,8 @@ def calculate_loss(outputs, targets):
     losses = {}
     w = 0.01
     for side in ['left', 'right']:
-        mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']
-        mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']
+        mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans'], targets[f'{side}_pose3d']
+        mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans'], outputs[f'{side}_pose3d']
         loss = sum(L2(mano_gt[i], mano_pred[i]) * w for i in range(len(mano_gt)))
         losses[f'{side}_mano'] = loss
 
@@ -307,10 +307,21 @@ def calculate_error(outputs, targets, errors, dataset, target_idx, model):
 
         mesh_gt, pose_gt = model.decode_mano(mano_gt[0], mano_gt[1], mano_gt[2], side, cam_ext)
         mesh_pred, pose_pred = model.decode_mano(mano_gt[0], mano_pred[1], mano_pred[2], side, cam_ext)
+        
+        mesh_gt = mesh_gt.view(bs, t, -1, 3)
+        mesh_pred = mesh_pred.view(bs, t, -1, 3)
 
+        # pose_gt = targets[f'{side}_pose3d']#.view(bs, t, -1, 3)
+        # pose_pred = outputs[f'{side}_pose3d']#.view(bs, t, -1, 3)
+        # print(pose_gt.shape, pose_pred.shape)
+
+        pose_gt = pose_gt.view(bs, t, -1, 3)
+        pose_pred = pose_pred.view(bs, t, -1, 3)
+
+        # print(pose_gt.shape, mesh_gt.shape)
         # Calculate hand mesh error for only the middle frame or the last frame
-        mesh_err = mpjpe(mesh_pred[target_idx], mesh_gt[target_idx]) * 1000
-        pose_err = mpjpe(pose_pred[target_idx], pose_gt[target_idx]) * 1000
+        mesh_err = mpjpe(mesh_pred[:, target_idx], mesh_gt[:, target_idx]) * 1000
+        pose_err = mpjpe(pose_pred[:, target_idx], pose_gt[:, target_idx]) * 1000
         errors[f'{side}_mesh_err'].update(mesh_err.item(), bs)
         errors[f'{side}_pose_err'].update(pose_err.item(), bs)
 
