@@ -279,10 +279,10 @@ def calculate_loss(outputs, targets):
     obj_pose_pred, obj_class = outputs['obj_pose'], outputs['obj_class']
     obj_pose_gt = targets['obj_pose']
 
-    loss = L2(obj_pose_gt, obj_pose_pred) * w 
-    obj_class_loss = CEL(obj_class, targets['label'])
-    loss += obj_class_loss
-    losses['obj'] = loss
+    # loss = L2(obj_pose_gt, obj_pose_pred) * w 
+    # obj_class_loss = CEL(obj_class, targets['label'])
+    # loss += obj_class_loss
+    # losses['obj'] = loss
         
     total_loss = sum(loss for loss in losses.values())
 
