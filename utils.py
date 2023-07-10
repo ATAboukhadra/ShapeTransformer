@@ -269,7 +269,7 @@ CEL = torch.nn.CrossEntropyLoss()
 
 def calculate_loss(outputs, targets):
     losses = {}
-    w = 0.1
+    w = 0.01
     for side in ['left', 'right']:
         mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']
         mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']
@@ -279,10 +279,10 @@ def calculate_loss(outputs, targets):
     obj_pose_pred, obj_class = outputs['obj_pose'], outputs['obj_class']
     obj_pose_gt = targets['obj_pose']
 
-    # loss = L2(obj_pose_gt, obj_pose_pred) * w 
-    # obj_class_loss = CEL(obj_class, targets['label'])
-    # loss += obj_class_loss
-    # losses['obj'] = loss
+    loss = L2(obj_pose_gt, obj_pose_pred) * w 
+    obj_class_loss = CEL(obj_class, targets['label'])
+    loss += obj_class_loss
+    losses['obj'] = loss
         
     total_loss = sum(loss for loss in losses.values())
 
@@ -317,26 +317,26 @@ def calculate_error(outputs, targets, errors, dataset, target_idx, model):
     obj_pose, obj_class = outputs['obj_pose'], outputs['obj_class']
 
     # Calculate object class accuracy
-    # pred_labels = torch.argmax(obj_class, dim=1)
-    # pred_object_names = [dataset.object_names[l] for l in pred_labels]
-    # acc = (pred_labels == targets['label']).float().mean()
-    # errors['obj_acc'].update(acc, bs)
+    pred_labels = torch.argmax(obj_class, dim=1)
+    pred_object_names = [dataset.object_names[l] for l in pred_labels]
+    acc = (pred_labels == targets['label']).float().mean()
+    errors['obj_acc'].update(acc, bs)
 
-    # # Calculate object mesh error
-    # obj_pred = obj_pose[:, :, :1], obj_pose[:, :, 1:4], obj_pose[:, :, 4:]
-    # obj_pose_gt = targets['obj_pose']
-    # obj_gt = obj_pose_gt[:, :, :1], obj_pose_gt[:, :, 1:4], obj_pose_gt[:, :, 4:]
+    # Calculate object mesh error
+    obj_pred = obj_pose[:, :, :1], obj_pose[:, :, 1:4], obj_pose[:, :, 4:]
+    obj_pose_gt = targets['obj_pose']
+    obj_gt = obj_pose_gt[:, :, :1], obj_pose_gt[:, :, 1:4], obj_pose_gt[:, :, 4:]
     
-    # object_names = [dataset.object_names[l] for l in targets['label']]
+    object_names = [dataset.object_names[l] for l in targets['label']]
 
-    # for i in range(len(object_names)):
-    #     cam_ext_i = cam_ext.view(bs, t, 4, 4)[i]
-    #     obj_verts_pred, _ = dataset.transform_obj(object_names[i], obj_pred[0][i], obj_pred[1][i], obj_pred[2][i], cam_ext_i)
-    #     obj_verts_gt, _ = dataset.transform_obj(pred_object_names[i], obj_gt[0][i], obj_gt[1][i], obj_gt[2][i], cam_ext_i)
-    #     for part in ['top', 'bottom']:
-    #         if obj_verts_pred[part].shape[1] != obj_verts_gt[part].shape[1]:
-    #             continue
-    #         obj_mesh_err = mpjpe(obj_verts_pred[part][target_idx], obj_verts_gt[part][target_idx]) * 1000
-    #         errors[f'{part}_obj_err'].update(obj_mesh_err.item(), 1)
+    for i in range(len(object_names)):
+        cam_ext_i = cam_ext.view(bs, t, 4, 4)[i]
+        obj_verts_pred, _ = dataset.transform_obj(object_names[i], obj_pred[0][i], obj_pred[1][i], obj_pred[2][i], cam_ext_i)
+        obj_verts_gt, _ = dataset.transform_obj(pred_object_names[i], obj_gt[0][i], obj_gt[1][i], obj_gt[2][i], cam_ext_i)
+        for part in ['top', 'bottom']:
+            if obj_verts_pred[part].shape[1] != obj_verts_gt[part].shape[1]:
+                continue
+            obj_mesh_err = mpjpe(obj_verts_pred[part][target_idx], obj_verts_gt[part][target_idx]) * 1000
+            errors[f'{part}_obj_err'].update(obj_mesh_err.item(), 1)
 
     return errors
