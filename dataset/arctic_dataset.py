@@ -110,13 +110,12 @@ class ArcticDataset(Dataset):
         kps_cam = transform_points_batch(cam_ext, kps_world)
         return verts_cam, kps_cam
             
-    def load_hand_annotations(self, subject, seq_name, frame_num, cam_ext, cam_int):
+    def load_hand_annotations(self, subject, seq_name, frame_num, cam_ext, cam_int, valid):
         # t1 = time.time()
         # hand_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.mano.npy')
         hand_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.mano.npy')
         self.total += 1
         hand_dict = {}
-        valid = True
         try:
             hand_annotations = np.load(self.annotations.open(hand_annotations_path), allow_pickle=True).item()
 
@@ -127,7 +126,6 @@ class ArcticDataset(Dataset):
             }
             self.bad += 1
             valid = False
-
 
         pose2d = torch.zeros((2, 21, 2), device=self.device, dtype=torch.float32)
         for i, side in enumerate(['left', 'right']):
@@ -149,6 +147,9 @@ class ArcticDataset(Dataset):
             # print(hand_dict[f'{side}_mano'].shape)
             verts, kps = self.decode_mano(hand_dict[f'{side}_pose'].unsqueeze(0), hand[2].unsqueeze(0), hand[3].unsqueeze(0), side, cam_ext)
             kps_2d = project_3D_points(cam_int, kps)
+            if kps_2d.isnan().any():
+                # print(subject, seq_name, frame_num, kps.max(), cam_int, kps_2d.max(), valid)
+                valid = False
             pose2d[i] = kps_2d[0]
             hand_dict[f'{side}_pose3d'] = kps[0]
 
@@ -157,12 +158,11 @@ class ArcticDataset(Dataset):
 
         return hand_dict, valid
 
-    def load_obj_annotations(self, subject, seq_name, frame_num, cam_ext, cam_int, obj):
+    def load_obj_annotations(self, subject, seq_name, frame_num, cam_ext, cam_int, obj, valid):
         # obj_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.object.npy')
         obj_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.object.npy')
         self.total += 1
         obj_dict = {}
-        valid = True
         try:
             obj_annotations = np.load(self.annotations.open(obj_annotations_path), allow_pickle=True)
 
@@ -231,13 +231,13 @@ class ArcticDataset(Dataset):
         
         # _, pose2d, _, _, _ = detect_hand(img, detector=self.hand_detector)
         # pose2d = torch.zeros((2, 21, 2))
-        cam_ext, cam_int, valid_hand = self.load_camera_matrix(subject, seq_name, camera_num, frame_num)
-        hand_dict, valid_cam = self.load_hand_annotations(subject, seq_name, frame_num, cam_ext, cam_int)
-        obj_dict, valid_obj = self.load_obj_annotations(subject, seq_name, frame_num, cam_ext, cam_int, obj)
+        cam_ext, cam_int, valid = self.load_camera_matrix(subject, seq_name, camera_num, frame_num)
+        hand_dict, valid = self.load_hand_annotations(subject, seq_name, frame_num, cam_ext, cam_int, valid)
+        obj_dict, valid = self.load_obj_annotations(subject, seq_name, frame_num, cam_ext, cam_int, obj, valid)
 
         hand_dict.update(obj_dict)
         data_dict = hand_dict
-        data_dict['valid'] = valid_hand and valid_cam and valid_obj
+        data_dict['valid'] = valid
         data_dict['img'] = img
         data_dict['key'] = key
         # data_dict['hands_pose2d'] = pose2d.to(self.device)

@@ -48,6 +48,25 @@ from utils import initialize_masks
 #         x = x + self.pe[:x.size(0)]
 #         return self.dropout(x)
 
+class Transformer(nn.Module):
+    def __init__(self, num_tokens, hid_dim=32, num_layers=4, nhead=8, normalize_before=False) -> None:
+        super().__init__()
+
+        self.embed_layer = nn.Linear(input_dim, hid_dim)
+        self.temporal_pos_embed = nn.Parameter(torch.zeros(1, num_tokens, hid_dim))
+        temporal_encoder_layer = nn.TransformerEncoderLayer(d_model=hid_dim, nhead=nhead, batch_first=False)
+        temporal_encoder_norm = nn.LayerNorm(hid_dim) if normalize_before else None
+        self.temporal_encoder = nn.TransformerEncoder(temporal_encoder_layer, num_layers=num_layers, norm=temporal_encoder_norm)
+    
+    def forward(self, src):
+        bs, t, d = src.shape
+        src = src.view(bs * t, d)
+        src = self.embed_layer(src)
+        src = src.view(bs, t, d)
+        src = src + self.temporal_pos_embed
+        src = self.temporal_encoder(src)
+        return src
+
 class PoseFormer(nn.Module):
 
     def __init__(self, input_dim=2, output_dim=3, d_model=512, nhead=8, num_encoder_layers=4, num_kps=21, num_frames=9,

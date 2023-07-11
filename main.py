@@ -25,7 +25,7 @@ logger.info(f'combination: {args.causal, args.window_size, args.skip}')
 if 'HO3D' in args.data_root or 'ho' in args.data_root:
     trainset = Dataset(args.data_root, T=args.window_size, skip=args.skip, causal=args.causal, hdf5=args.hdf5)
     valset = Dataset(args.data_root, load_set='val', T=args.window_size, skip=args.skip, causal=args.causal, hdf5=args.hdf5)
-    length = len(trainset) // args.batch_size
+    length = len(trainset) // args.batch_size 
 # DexYCB
 elif 'DexYCB' in args.data_root:
     dataset, trainset, train_factory = create_pipe(args.data_root, 'train', args, sequential=True)

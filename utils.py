@@ -13,6 +13,7 @@ from pytorch3d.renderer import Textures
 from pytorch3d.structures.meshes import Meshes
 from pytorch3d.io import load_obj
 from manopth.manolayer import ManoLayer
+from tqdm import tqdm
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 data_path = '/home2/HO3D_v3'
@@ -31,7 +32,9 @@ def parse_args():
     ap.add_argument("--meta_root", type=str, help="Directory containing additional data", default='/data/DexYCB')
     ap.add_argument("--output_folder", type=str, help="relative path to save checkpoint", default='checkpoints/transformer')
     ap.add_argument("--batch_size", type=int, help="batch size", default='8')
+    ap.add_argument("--model_name", type=str, help="name of the model", default='stohrmer')
     ap.add_argument("--log_interval", type=int, help="How many batches needes to log", default='50')
+    ap.add_argument("--val_interval", type=int, help="How many batches needes to log", default='100000')
     ap.add_argument("--epochs", type=int, help="number of epochs after which to stop", default='10')
     ap.add_argument("--window_size", type=int, help="How many batches needes to log", default='9')
     ap.add_argument("--skip", type=int, help="how many frames to jump", default='1')
@@ -267,12 +270,25 @@ L1 = torch.nn.L1Loss()
 L2 = torch.nn.MSELoss()
 CEL = torch.nn.CrossEntropyLoss()
 
-def calculate_loss(outputs, targets):
+def calculate_pose_loss(outputs, targets, target_idx=0, mode='loss'):
+    left_pose_gt = targets['left_pose3d'][:, target_idx]
+    right_pose_gt = targets['right_pose3d'][:, target_idx]
+    # pose_gt = torch.cat([left_pose_gt, right_pose_gt], dim=2)
+    # pose_loss = L2(outputs, pose_gt)
+    left_pose_loss = mpjpe(outputs[:, 0, :21], left_pose_gt)
+    right_pose_loss = mpjpe(outputs[:, 0, 21:], right_pose_gt)
+    pose_loss = left_pose_loss + right_pose_loss
+    return pose_loss if mode == 'loss' else (left_pose_loss * 1000, right_pose_loss * 1000)
+
+def calculate_loss(outputs, targets, target_idx=0):
+    if not isinstance(outputs, dict):
+        return calculate_pose_loss(outputs, targets, target_idx)
+
     losses = {}
     w = 0.01
     for side in ['left', 'right']:
-        mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans'], targets[f'{side}_pose3d']
-        mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans'], outputs[f'{side}_pose3d']
+        mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']#, targets[f'{side}_pose3d']
+        mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']#, outputs[f'{side}_pose3d']
         loss = sum(L2(mano_gt[i], mano_pred[i]) * w for i in range(len(mano_gt)))
         losses[f'{side}_mano'] = loss
 
@@ -289,9 +305,15 @@ def calculate_loss(outputs, targets):
     return total_loss
 
 def calculate_error(outputs, targets, errors, dataset, target_idx, model):
+    bs, t = targets[f'left_pose'].shape[:2]
+
+    if not isinstance(outputs, dict):
+        left_pose_err, right_pose_err = calculate_pose_loss(outputs, targets, target_idx, mode='error')
+        errors['left_pose_err'].update(left_pose_err, bs)
+        errors['right_pose_err'].update(right_pose_err, bs)
+        return errors
 
     # Calculate hand mesh error
-    bs, t = targets[f'left_pose'].shape[:2]
     cam_ext = targets['cam_ext'].unsqueeze(1).view(bs * t, 4, 4)
 
     for side in ['left', 'right']:
@@ -351,3 +373,19 @@ def calculate_error(outputs, targets, errors, dataset, target_idx, model):
             errors[f'{part}_obj_err'].update(obj_mesh_err.item(), 1)
 
     return errors
+
+def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model, logger, e, device):
+
+    for _, data_dict in tqdm(enumerate(valloader), total=val_count // batch_size):
+        if data_dict is None: continue
+
+        for k in data_dict.keys():
+            data_dict[k] = data_dict[k].to(device) if isinstance(data_dict[k], torch.Tensor) else data_dict[k]
+        data_dict['img'] = [torch.stack(img_batch, dim=0).to(device) for img_batch in data_dict['img']]
+
+        outputs = model(data_dict)
+        calculate_error(outputs, data_dict, errors, dataset, target_idx, model)
+    
+    error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
+    logger.info(f'epoch {e+1} val: {error_list}')
+

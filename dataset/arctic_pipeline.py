@@ -53,14 +53,13 @@ def batch_samples(samples, non_changing_keys=None, temporal=False):
     if len(valid_samples) == 0:
         return None
 
-
     for key in keys:
         if non_changing_keys is not None and key in non_changing_keys:
             samples_dict[key] = valid_samples[0][key]
         elif key == 'img':
             samples_dict[key] = [s[key] for s in valid_samples]
         elif key == 'valid':
-            samples_dict[key] = valid_samples[0][key]
+            samples_dict[key] = all([s[key] for s in valid_samples])
         elif isinstance(valid_samples[0][key], torch.Tensor):
             samples_dict[key] = torch.cat([s[key].unsqueeze(0) for s in valid_samples], dim=0)
         elif isinstance(valid_samples[0][key], np.ndarray):

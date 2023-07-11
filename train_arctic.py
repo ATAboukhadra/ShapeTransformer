@@ -7,8 +7,9 @@ from dataset.arctic_pipeline import create_pipe, batch_samples
 from tqdm import tqdm
 from models.Stohrmer import Stohrmer
 import os
-from utils import AverageMeter, parse_args, create_logger, calculate_loss, calculate_error
+from utils import AverageMeter, parse_args, create_logger, calculate_loss, calculate_error, run_val
 from tqdm import tqdm
+from models.model_poseformer import PoseTransformer
 
 np.set_printoptions(precision=2)
 
@@ -29,7 +30,10 @@ valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=args.batch_size
 dataset = decoder.dataset
 hand_faces = dataset.hand_faces
 
-model = Stohrmer(device, num_kps=42, num_frames=args.window_size).to(device)
+if args.model_name == 'stohrmer':
+    model = Stohrmer(device, num_kps=42, num_frames=args.window_size).to(device)
+else:
+    model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2).to(device)
 
 num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 logger.info(f'total number of parameters: {num_params}')
@@ -65,13 +69,8 @@ for e in range(args.epochs):
             logger.info(f'\n[{i+1} / {train_count // args.batch_size}]: {error_list}')
             errors = {k: AverageMeter() for k in keys}
 
-    torch.save(model.state_dict(), f'{args.output_folder}/model_{e}.pth')
-
-    for i, data_dict in tqdm(enumerate(valloader), total=val_count // args.batch_size):
-        outputs = model(data_dict)
-        calculate_error(outputs, data_dict, errors, dataset, target_idx, model)
-    
-    error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
-    logger.info(f'epoch {e+1} val: {error_list}')
-
+        if (i+1) % args.val_interval == 0:
+            run_val(valloader, val_count, args.batch_size, errors, dataset, target_idx, model, logger, e, device)
+            errors = {k: AverageMeter() for k in keys}
+            torch.save(model.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
