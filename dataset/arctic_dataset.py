@@ -34,18 +34,18 @@ class ArcticDataset(Dataset):
 
         # self.hand_detector = init_hand_kp_model()
         self.annotations = zipfile.ZipFile(os.path.join(self.root, 'raw_seqs.zip'))
+        self.prefetch_annotations()
         self.meta_archive = zipfile.ZipFile(os.path.join(self.root, 'meta.zip'))
         self.meta = json.load(self.meta_archive.open('meta/misc.json'))
         self.objects_root = objects_root
         self.device = device
         self.objects = {name: {} for name in os.listdir(objects_root)}
         self.object_keypoints = {name: {} for name in os.listdir(objects_root)}
+        self.num_kps_obj = 30
+        self.resize_factor = 4
         self.load_objects()
         self.object_names = sorted(list(self.objects.keys()))
-        # self.transform = transforms.Compose([transforms.ToTensor(), 
-        #                                     #  transforms.Resize(500, antialias=True)
-        #                                      ])
-        # self.iterable = iterable
+
         self.total, self.bad = 0, 0
         if not iterable: self.scan_dataset()
 
@@ -64,32 +64,64 @@ class ArcticDataset(Dataset):
                         self.dataset_keys.append('/'.join([subject, seq, camera, frame]))
 
     def load_objects(self):
+        sampled_indices = np.arange(0, 300, 300 // self.num_kps_obj)
         for obj in self.objects.keys():
             for part in ['bottom', 'top']:
                 verts, faces, aux = load_obj(os.path.join(self.objects_root, obj, f'{part}.obj'), device=self.device)
                 tex = self.create_texture(faces, aux)
                 self.objects[obj][part] = (verts, faces, tex)
-                keypoints = torch.tensor(json.load(open(os.path.join(self.objects_root, obj, f'{part}_keypoints_300.json')))['keypoints'])
+                keypoints = json.load(open(os.path.join(self.objects_root, obj, f'{part}_keypoints_300.json')))['keypoints']
+                keypoints = torch.tensor(keypoints)[:self.num_kps_obj]
                 self.object_keypoints[obj][part] = keypoints
+
+
+    def prefetch_annotations(self):
+        print('Prefetching Annotations ..', flush=True)
+
+        self.ego_annotations_dict = {}
+        self.hand_annotations_dict = {}
+        self.obj_annotations_dict = {}
+
+        for file in self.annotations.filelist:
+            if 'smpl' in file.filename: continue
+            key = file.filename
+            with self.annotations.open(file, 'r') as f:
+                if 'mano' in key:
+                    self.hand_annotations_dict[key] = np.load(f, allow_pickle=True).item()
+                elif 'object' in key:
+                    self.obj_annotations_dict[key] = np.load(f, allow_pickle=True)
+                elif 'dist' in key:
+                    self.ego_annotations_dict[key] = np.load(f, allow_pickle=True).item()
 
 
     def __len__(self):
         return len(self.dataset_keys)
+
+    def downscale_cam_int(self, cam_int):
+        fx, fy = cam_int[0, 0], cam_int[1, 1]
+        cx, cy = cam_int[0, 2], cam_int[1, 2]
+        fx, fy = fx / self.resize_factor, fy / self.resize_factor
+        cx, cy = cx / self.resize_factor, cy / self.resize_factor
+        cam_int[0, 0], cam_int[1, 1] = fx, fy
+        cam_int[0, 2], cam_int[1, 2] = cx, cy
+        return cam_int
 
     def load_camera_matrix(self, subject, seq_name, camera, frame_num):
         ego_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.egocam.dist.npy')
         
         self.total += 1
         valid = True
-        try:
-            ego_annotations = np.load(self.annotations.open(ego_annotations_path), allow_pickle=True).item()
-        except:
+
+        if ego_annotations_path not in self.ego_annotations_dict.keys():
+            print(ego_annotations_path)
             ego_annotations = {}
             ego_annotations['R_k_cam_np'] = np.zeros((1000, 3, 3))
             ego_annotations['T_k_cam_np'] = np.zeros((1000, 3, 1))
             ego_annotations['intrinsics'] = np.zeros((3, 3))
             self.bad += 1
             valid = False
+        else:
+            ego_annotations = self.ego_annotations_dict[ego_annotations_path]
 
         if camera > 0:
             cam_ext = torch.tensor(self.meta[subject]['world2cam'][camera-1], device=self.device).unsqueeze(0)
@@ -100,6 +132,9 @@ class ArcticDataset(Dataset):
             T = torch.tensor(ego_annotations[f'T_k_cam_np'][min(frame_num, num_frames)], device=self.device, dtype=torch.float32) 
             cam_ext = torch.cat((torch.cat((R, T), dim=1), torch.tensor([[0, 0, 0, 1]], device=self.device)), dim=0).unsqueeze(0)
             cam_int = torch.tensor(ego_annotations['intrinsics'], device=self.device, dtype=torch.float32)
+
+        cam_int = self.downscale_cam_int(cam_int)
+
         return cam_ext, cam_int, valid
 
     def decode_mano(self, pose, shape, trans, side, cam_ext):
@@ -116,16 +151,17 @@ class ArcticDataset(Dataset):
         hand_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.mano.npy')
         self.total += 1
         hand_dict = {}
-        try:
-            hand_annotations = np.load(self.annotations.open(hand_annotations_path), allow_pickle=True).item()
-
-        except: # Bad zip file
+        if hand_annotations_path not in self.hand_annotations_dict.keys():
+            print(hand_annotations_path)
             hand_annotations = {
                 'left': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))},
                 'right': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))}
             }
             self.bad += 1
             valid = False
+        else:
+            hand_annotations = self.hand_annotations_dict[hand_annotations_path]
+            
 
         pose2d = torch.zeros((2, 21, 2), device=self.device, dtype=torch.float32)
         for i, side in enumerate(['left', 'right']):
@@ -163,19 +199,22 @@ class ArcticDataset(Dataset):
         obj_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.object.npy')
         self.total += 1
         obj_dict = {}
-        try:
-            obj_annotations = np.load(self.annotations.open(obj_annotations_path), allow_pickle=True)
 
-        except: # Bad zip file
+        if obj_annotations_path not in self.obj_annotations_dict.keys():
+            print(obj_annotations_path)
             obj_annotations = np.zeros((1000, 7), dtype=np.float32)
             self.bad += 1
             valid = False
+        else:
+            obj_annotations = self.obj_annotations_dict[obj_annotations_path]
 
         num_frames = obj_annotations.shape[0] - 1
         obj_pose = torch.tensor(obj_annotations[min(frame_num, num_frames)], device=self.device)
         obj_dict['obj_pose'] = obj_pose
         obj_dict['object_name'] = obj
         obj_dict['label'] = torch.tensor(self.object_names.index(obj), dtype=torch.long, device=self.device)
+        # _, obj_kps = self.transform_obj(obj, obj_pose[:3], obj_pose[3:7], obj_pose[7:10], cam_ext)
+        # print(obj_kps.shape)
         return obj_dict, valid
 
     def transform_points(self, points, cam_ext, part, quat_arti, quat_global, trans):
@@ -198,7 +237,7 @@ class ArcticDataset(Dataset):
         quat_global = axis_angle_to_quaternion(rot).unsqueeze(1)
 
         bs = rot.shape[0]
-        obj_kps = torch.zeros((2, bs, 300, 3), device=self.device, dtype=torch.float32)
+        obj_kps = torch.zeros((2, bs, self.num_kps_obj, 3), device=self.device, dtype=torch.float32)
         
         for i, part in enumerate(['top', 'bottom']):
             verts = self.objects[obj][part][0].unsqueeze(0).repeat(bs, 1, 1).to(articulation.device)#.unsqueeze(0)
@@ -222,9 +261,8 @@ class ArcticDataset(Dataset):
         tex = Textures(verts_uvs=verts_uvs, faces_uvs=faces_uvs, maps=texture_image)
         return tex
     
-    def get_anno(self, img, key):
+    def get_anno(self, key):
         subject, seq_name, camera, frame = key.split('/')
-
         camera_num = int(camera)
         frame_num = int(frame.split('.')[0]) - 1
         obj = seq_name.split('_')[0]
@@ -238,7 +276,6 @@ class ArcticDataset(Dataset):
         hand_dict.update(obj_dict)
         data_dict = hand_dict
         data_dict['valid'] = valid
-        data_dict['img'] = img
         data_dict['key'] = key
         # data_dict['hands_pose2d'] = pose2d.to(self.device)
         data_dict['cam_ext'] = cam_ext[0]
@@ -252,7 +289,8 @@ class ArcticDataset(Dataset):
         img_path = os.path.join(self.root, 'images', subject, seq_name, camera, frame)
         img = cv2.cvtColor(cv2.imread(img_path), cv2.COLOR_BGR2RGB)
         data_dict = self.get_anno(img, key)
-        
+        data_dict['rgb'] = img
+
         return data_dict
 
 

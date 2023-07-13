@@ -49,7 +49,7 @@ class Stohrmer(nn.Module):
         spatial_pose_features = self.spatial_encoder(pose2d).view(bs, t, -1)
 
         # Image Features
-        img_list = batch_dict['img']
+        img_list = batch_dict['rgb']
         features_list = []
         for img_batch in img_list:
             features = self.resnet18(img_batch).squeeze(-1).squeeze(-1)

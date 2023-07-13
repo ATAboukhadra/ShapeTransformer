@@ -285,9 +285,9 @@ def calculate_loss(outputs, targets, target_idx=0):
         return calculate_pose_loss(outputs, targets, target_idx)
 
     losses = {}
-    w = 0.01
+    w = 1.0
     for side in ['left', 'right']:
-        mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']#, targets[f'{side}_pose3d']
+        mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans']#, targets[f'{side}_pose3d']
         mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']#, outputs[f'{side}_pose3d']
         loss = sum(L2(mano_gt[i], mano_pred[i]) * w for i in range(len(mano_gt)))
         losses[f'{side}_mano'] = loss
@@ -296,7 +296,7 @@ def calculate_loss(outputs, targets, target_idx=0):
     obj_pose_gt = targets['obj_pose']
 
     loss = L2(obj_pose_gt, obj_pose_pred) * w 
-    obj_class_loss = CEL(obj_class, targets['label'])
+    obj_class_loss = CEL(obj_class, targets['label'][:, 0])
     loss += obj_class_loss
     losses['obj'] = loss
         
@@ -320,7 +320,7 @@ def calculate_error(outputs, targets, errors, dataset, target_idx, model):
         mano_gt = [targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']]
         mano_pred = [outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']]
 
-        mano_gt[1] = mano_gt[1].unsqueeze(1).repeat(1, t, 1)
+        # mano_gt[1] = mano_gt[1].unsqueeze(1).repeat(1, t, 1)
         mano_pred[1] = mano_pred[1].unsqueeze(1).repeat(1, t, 1)
 
         for i in range(len(mano_gt)):
@@ -352,7 +352,7 @@ def calculate_error(outputs, targets, errors, dataset, target_idx, model):
     # Calculate object class accuracy
     pred_labels = torch.argmax(obj_class, dim=1)
     pred_object_names = [dataset.object_names[l] for l in pred_labels]
-    acc = (pred_labels == targets['label']).float().mean()
+    acc = (pred_labels == targets['label'][:, 0]).float().mean()
     errors['obj_acc'].update(acc, bs)
 
     # Calculate object mesh error
@@ -360,7 +360,7 @@ def calculate_error(outputs, targets, errors, dataset, target_idx, model):
     obj_pose_gt = targets['obj_pose']
     obj_gt = obj_pose_gt[:, :, :1], obj_pose_gt[:, :, 1:4], obj_pose_gt[:, :, 4:]
     
-    object_names = [dataset.object_names[l] for l in targets['label']]
+    object_names = [dataset.object_names[l] for l in targets['label'][:, 0]]
 
     for i in range(len(object_names)):
         cam_ext_i = cam_ext.view(bs, t, 4, 4)[i]
