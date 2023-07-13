@@ -48,77 +48,25 @@ def temporal_batching(batch):
     data_dict = {}
     bs = len(batch)
     ws = len(batch[0])
+
     for i, window in enumerate(batch):
         for j, sample in enumerate(window):
             for path, data in sample:
                 comp = get_component_name(path)
                 if comp not in data_dict.keys():
-                    if comp == 'rgb':
-                        data_dict[comp] = []
-                    elif isinstance(data, torch.Tensor):
+                    if isinstance(data, torch.Tensor) and comp != 'rgb':
                         data_dict[comp] = torch.zeros((bs, ws, *data.shape), dtype=data.dtype)
                     elif isinstance(data, np.ndarray):
                         data_dict[comp] = np.zeros((bs, ws, *data.shape), dtype=data.dtype)
                     else:
                         data_dict[comp] = [[[None]] * ws] * bs
-                if comp == 'rgb':
-                    data_dict[comp].append(torch.zeros((ws, *data.shape), dtype=data.dtype))
 
                 data_dict[comp][i][j] = data
+    
+    data_dict['rgb'] = [torch.stack(image_batch, dim=0) for image_batch in data_dict['rgb']]
 
     return data_dict
-    # def decode_sample(self, sample: DataChunk):
-    #     splits = sample[0][0].split('/')
 
-    #     key = splits[-1].split('.')[:2]
-    #     seq_id = key[0].split('_')
-
-    #     key = '/'.join([seq_id[0], '_'.join(seq_id[1:-1]), seq_id[-1], key[1]]) 
-        
-    #     data_dict = self.dataset.get_anno(sample[0][1], key)
-    #     return data_dict
-
-
-    # def __call__(self, sample: DataChunk):
-    #     seq_samples = [self.decode_sample(s) for s in sample]
-    #     non_changing_keys = ['left_shape', 'right_shape', 'object_name', 'label', 'cam_int']
-    #     temporal_sample = batch_samples(seq_samples, non_changing_keys=non_changing_keys, temporal=True)
-        
-    #     return temporal_sample
-
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-
-# def batch_samples(samples, non_changing_keys=None, temporal=False):
-#     # Concatenate the tensors for each key across all dictionaries
-#     keys = list(samples[0].keys())
-#     samples_dict = {}
-#     valid_samples = [s for s in samples if s['valid'] == 1] if not temporal else samples
-    
-#     # if len(valid_samples) < len(samples):
-#     #     print(len(valid_samples), flush=True)
-    
-#     if len(valid_samples) == 0:
-#         return None
-
-#     for key in keys:
-#         if non_changing_keys is not None and key in non_changing_keys:
-#             samples_dict[key] = valid_samples[0][key]
-#         elif key == 'img':
-#             samples_dict[key] = [s[key] for s in valid_samples]
-#         elif key == 'valid':
-#             samples_dict[key] = all([s[key] for s in valid_samples])
-#         elif isinstance(valid_samples[0][key], torch.Tensor):
-#             samples_dict[key] = torch.cat([s[key].unsqueeze(0) for s in valid_samples], dim=0)
-#         elif isinstance(valid_samples[0][key], np.ndarray):
-#             samples_dict[key] = torch.cat([torch.tensor(s[key]).unsqueeze(0) for s in valid_samples], dim=0)
-#         else:
-#             samples_dict[key] = [d[key] for d in valid_samples]
-#     return samples_dict
-
-
-# class ImageResizer():
-#     def __init__(self) -> None:
-#         pass
 def resize_sample(path, sample):
     resized_img = resize(sample, 500, antialias=True)
     return resized_img
