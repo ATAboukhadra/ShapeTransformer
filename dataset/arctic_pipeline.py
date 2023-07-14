@@ -54,6 +54,7 @@ def temporal_batching(batch):
             for path, data in sample:
                 comp = get_component_name(path)
                 if comp not in data_dict.keys():
+                    if isinstance(data, torch.Tensor) and data.isnan().any(): print(path)
                     if isinstance(data, torch.Tensor) and comp != 'rgb':
                         data_dict[comp] = torch.zeros((bs, ws, *data.shape), dtype=data.dtype)
                     elif isinstance(data, np.ndarray):

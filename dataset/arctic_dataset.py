@@ -113,7 +113,6 @@ class ArcticDataset(Dataset):
         valid = True
 
         if ego_annotations_path not in self.ego_annotations_dict.keys():
-            print(ego_annotations_path)
             ego_annotations = {}
             ego_annotations['R_k_cam_np'] = np.zeros((1000, 3, 3))
             ego_annotations['T_k_cam_np'] = np.zeros((1000, 3, 1))
@@ -152,7 +151,6 @@ class ArcticDataset(Dataset):
         self.total += 1
         hand_dict = {}
         if hand_annotations_path not in self.hand_annotations_dict.keys():
-            print(hand_annotations_path)
             hand_annotations = {
                 'left': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))},
                 'right': {'rot': np.zeros((1000, 3)), 'pose': np.zeros((1000, 45)), 'shape': np.zeros((10)), 'trans': np.zeros((1000, 3))}
@@ -201,7 +199,6 @@ class ArcticDataset(Dataset):
         obj_dict = {}
 
         if obj_annotations_path not in self.obj_annotations_dict.keys():
-            print(obj_annotations_path)
             obj_annotations = np.zeros((1000, 7), dtype=np.float32)
             self.bad += 1
             valid = False
