@@ -71,7 +71,7 @@ class ArcticDataset(Dataset):
                 tex = self.create_texture(faces, aux)
                 self.objects[obj][part] = (verts, faces, tex)
                 keypoints = json.load(open(os.path.join(self.objects_root, obj, f'{part}_keypoints_300.json')))['keypoints']
-                keypoints = torch.tensor(keypoints)[:self.num_kps_obj]
+                keypoints = torch.tensor(keypoints)#[:self.num_kps_obj]
                 self.object_keypoints[obj][part] = keypoints
 
 
@@ -210,9 +210,24 @@ class ArcticDataset(Dataset):
         obj_dict['obj_pose'] = obj_pose
         obj_dict['object_name'] = obj
         obj_dict['label'] = torch.tensor(self.object_names.index(obj), dtype=torch.long, device=self.device)
-        # _, obj_kps = self.transform_obj(obj, obj_pose[:3], obj_pose[3:7], obj_pose[7:10], cam_ext)
+        _, obj_kps = self.transform_obj(obj, obj_pose[0].unsqueeze(0), obj_pose[1:4].unsqueeze(0), obj_pose[4:].unsqueeze(0) / 1000, cam_ext)
+        obj_kps2d = project_3D_points(cam_int, obj_kps.view(2, -1, 3))
+        top_bb = self.calculate_bounding_box(obj_kps2d[0])
+        bottom_bb = self.calculate_bounding_box(obj_kps2d[1])
+        bbs = torch.stack((top_bb, bottom_bb), dim=0)
+        visibility = torch.ones((2, self.num_kps_obj, 1), dtype=torch.float32)
+        # obj_dict['keypoints'] = 
+        obj_dict['keypoints'] = torch.cat((obj_kps2d[:, :self.num_kps_obj], visibility), dim=2)
+        obj_dict['boxes'] = bbs
+        obj_dict['labels'] = self.create_obj_labels(obj)
         # print(obj_kps.shape)
         return obj_dict, valid
+
+    def create_obj_labels(self, obj_name):
+        obj_label_top = self.object_names.index(obj_name) * 2 
+        obj_label_bottom = obj_label_top + 1
+        obj_labels = torch.tensor([obj_label_top, obj_label_bottom], dtype=torch.long)
+        return obj_labels
 
     def transform_points(self, points, cam_ext, part, quat_arti, quat_global, trans):
         num_verts = points.shape[1]
@@ -234,7 +249,7 @@ class ArcticDataset(Dataset):
         quat_global = axis_angle_to_quaternion(rot).unsqueeze(1)
 
         bs = rot.shape[0]
-        obj_kps = torch.zeros((2, bs, self.num_kps_obj, 3), device=self.device, dtype=torch.float32)
+        obj_kps = torch.zeros((2, bs, 300, 3), device=self.device, dtype=torch.float32)
         
         for i, part in enumerate(['top', 'bottom']):
             verts = self.objects[obj][part][0].unsqueeze(0).repeat(bs, 1, 1).to(articulation.device)#.unsqueeze(0)
@@ -258,6 +273,13 @@ class ArcticDataset(Dataset):
         tex = Textures(verts_uvs=verts_uvs, faces_uvs=faces_uvs, maps=texture_image)
         return tex
     
+    def calculate_bounding_box(self, point2d):
+        
+        x_min, y_min = int(min(point2d[:,0])), int(min(point2d[:,1]))
+        x_max, y_max = int(max(point2d[:,0])), int(max(point2d[:,1]))
+        
+        return torch.tensor([x_min, y_min, x_max, y_max])
+
     def get_anno(self, key):
         subject, seq_name, camera, frame = key.split('/')
         camera_num = int(camera)

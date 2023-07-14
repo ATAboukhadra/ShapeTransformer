@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 from render_utils import create_renderer, render_arctic_mesh
-from vis_utils import showHandJoints
+from vis_utils import showHandJoints, draw_bb
 from dataset.arctic_pipeline import create_pipe, temporal_batching
 from tqdm import tqdm
 from torchvision.transforms.functional import resize
@@ -33,7 +33,7 @@ hand_faces = dataset.hand_faces
 
 for i, data_dict in tqdm(enumerate(trainloader), total=num_samples // batch_size):
     articulation = data_dict['obj_pose'][0][0][0]
-    if i < 1000 or articulation < 0.1: # or data_dict['img'][0][0].shape[-2:][0] == 700:
+    if i < 10 or articulation < 0.1: # or data_dict['img'][0][0].shape[-2:][0] == 700:
         continue
     
     data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
@@ -56,7 +56,7 @@ for i, data_dict in tqdm(enumerate(trainloader), total=num_samples // batch_size
     cam_ext = data_dict['cam_ext'][0]
     obj_verts, obj_kps = dataset.transform_obj(object_name, articulation, rot, trans, cam_ext)
 
-    obj_kps2d = project_3D_points(cam_int, obj_kps.view(-1, dataset.num_kps_obj, 3)).view(2, sliding_window_size, -1, 2).cpu().numpy()
+    obj_kps2d = data_dict['keypoints'][0].view(sliding_window_size, 2, -1, 2).cpu().numpy()
     
     for i in tqdm(range(data_dict['rgb'][0].shape[0])):
         img = data_dict['rgb'][0][i].cpu().numpy().transpose(1, 2, 0)
@@ -66,9 +66,12 @@ for i, data_dict in tqdm(enumerate(trainloader), total=num_samples // batch_size
             for hand in data_dict['hands_pose2d'][0][i]:
                 img = showHandJoints(img, hand.cpu().numpy())
         plt.subplot(*fig_dim, i+1)
+        boxes = data_dict['boxes'][0, i].cpu().numpy()
+        img = draw_bb(img, boxes[0], (255, 0, 0))
+        img = draw_bb(img, boxes[1], (0, 255, 0))
         plt.imshow(img)
-        plt.scatter(obj_kps2d[0, i, :, 0], obj_kps2d[0, i, :, 1], c='peachpuff', s=1)
-        plt.scatter(obj_kps2d[1, i, :, 0], obj_kps2d[1, i, :, 1], c='lightblue', s=1)
+        plt.scatter(obj_kps2d[i, 0, :, 0], obj_kps2d[i, 0, :, 1], c='peachpuff', s=1)
+        plt.scatter(obj_kps2d[i, 1, :, 0], obj_kps2d[i, 1, :, 1], c='lightblue', s=1)
 
         verts_list, faces_list, textures_list = [], [], []
     

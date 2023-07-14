@@ -102,7 +102,7 @@ def create_pipe(in_dir, objects_root, subset, device, sliding_window_size, facto
     # Make an educated guess on a good size for the shuffle buffer using the meta-data.
     # shuffle_buffer_size = int(multiplier * shard_size)
     
-    shuffle_buffer_size = 2 # This is now the number of sequences in the buffer
+    shuffle_buffer_size = 4 # This is now the number of sequences in the buffer
 
     # Using the metadata created in the conversion process, the streaming pipeline can be created automatically.
     arctic_decoder = ArcticDecoder(in_dir, objects_root, device) if arctic_decoder is None else arctic_decoder

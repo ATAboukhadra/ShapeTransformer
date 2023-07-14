@@ -285,17 +285,17 @@ def calculate_loss(outputs, targets, target_idx=0):
         return calculate_pose_loss(outputs, targets, target_idx)
 
     losses = {}
-    w = 1.0
+    w = 0.01
     for side in ['left', 'right']:
         mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans']#, targets[f'{side}_pose3d']
         mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']#, outputs[f'{side}_pose3d']
-        loss = sum(L2(mano_gt[i], mano_pred[i]) * w for i in range(len(mano_gt)))
+        loss = sum(L1(mano_gt[i], mano_pred[i]) * w for i in range(len(mano_gt)))
         losses[f'{side}_mano'] = loss
 
     obj_pose_pred, obj_class = outputs['obj_pose'], outputs['obj_class']
     obj_pose_gt = targets['obj_pose']
 
-    loss = L2(obj_pose_gt, obj_pose_pred) * w 
+    loss = L1(obj_pose_gt, obj_pose_pred) * w 
     obj_class_loss = CEL(obj_class, targets['label'][:, 0])
     loss += obj_class_loss
     losses['obj'] = loss
