@@ -278,7 +278,8 @@ class ArcticDataset(Dataset):
         x_min, y_min = int(min(point2d[:,0])), int(min(point2d[:,1]))
         x_max, y_max = int(max(point2d[:,0])), int(max(point2d[:,1]))
         
-        return torch.tensor([x_min, y_min, x_max, y_max])
+        box = torch.tensor([x_min, y_min, x_max, y_max], dtype=torch.float32)
+        return box
 
     def get_anno(self, key):
         subject, seq_name, camera, frame = key.split('/')
