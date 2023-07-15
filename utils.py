@@ -40,7 +40,7 @@ def parse_args():
     ap.add_argument("--skip", type=int, help="how many frames to jump", default='1')
     ap.add_argument("--d_model", type=int, help="number of features in transformer", default='32')
     ap.add_argument("--num_workers", type=int, help="number of workers", default='8')
-    ap.add_argument("--num_seq", type=int, help="number of sequences in each workers shuffle buffer", default='4')
+    ap.add_argument("--num_seqs", type=int, help="number of sequences in each workers shuffle buffer", default='4')
     ap.add_argument("--hdf5", action='store_true', help="Load data from HDF5 file") 
     ap.add_argument("--causal", action='store_true', help="Use only previous frames")     
     ap.add_argument("--pretrained_model", type=str, help="path to pretrained weights")     
