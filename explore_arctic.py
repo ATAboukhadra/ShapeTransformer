@@ -20,11 +20,12 @@ batch_size = 1
 num_workers = 1
 sliding_window_size = 3
 scale_factor = 4
+num_seqs = 16
 
-train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', 'cpu', sliding_window_size)
+train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', 'cpu', sliding_window_size, num_seqs)
 trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=0, collate_fn=temporal_batching)
 
-val_pipeline, _, _, _ = create_pipe(root, objects_root, 'val', 'cpu', sliding_window_size, factory=factory, arctic_decoder=decoder)
+val_pipeline, _, _, _ = create_pipe(root, objects_root, 'val', 'cpu', sliding_window_size, num_seqs, factory=factory, arctic_decoder=decoder)
 valloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=0, collate_fn=temporal_batching)
 
 # dataset = ArcticDataset(root, objects_root, device=device)

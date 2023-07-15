@@ -381,7 +381,7 @@ def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model
 
         for k in data_dict.keys():
             data_dict[k] = data_dict[k].to(device) if isinstance(data_dict[k], torch.Tensor) else data_dict[k]
-        data_dict['img'] = [torch.stack(img_batch, dim=0).to(device) for img_batch in data_dict['img']]
+        data_dict['rgb'] = [torch.stack(img_batch, dim=0).to(device) for img_batch in data_dict['rgb']]
 
         outputs = model(data_dict)
         calculate_error(outputs, data_dict, errors, dataset, target_idx, model)
