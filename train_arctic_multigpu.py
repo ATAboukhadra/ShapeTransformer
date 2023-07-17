@@ -18,7 +18,7 @@ device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 
 args = parse_args()
 
-dh = DistributedHelper(args.num_gpus)
+dh = DistributedHelper()
 target_idx = args.window_size-1 if args.causal else args.window_size // 2
 
 if not os.path.exists(args.output_folder): os.mkdir(args.output_folder)

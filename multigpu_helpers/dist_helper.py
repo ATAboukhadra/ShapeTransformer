@@ -16,8 +16,8 @@ class DistributedHelper:
     __slots__ = "is_distributed", "world_size", "rank", "local_rank", "master_addr", "master_port", "is_master",\
                 "conf", "logger", "train_summary_writer", "val_summary_writer"
 
-    def __init__(self, gpus, backend: str = "nccl"):
-        if dist.is_available() and gpus > 1:
+    def __init__(self, backend: str = "nccl"):
+        if dist.is_available():
             dist.init_process_group(backend)
         mp.set_start_method("forkserver")
 
