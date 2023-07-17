@@ -40,6 +40,7 @@ def parse_args():
     ap.add_argument("--skip", type=int, help="how many frames to jump", default='1')
     ap.add_argument("--d_model", type=int, help="number of features in transformer", default='32')
     ap.add_argument("--num_workers", type=int, help="number of workers", default='8')
+    ap.add_argument("--num_gpus", type=int, help="number of GPUs", default='1')
     ap.add_argument("--num_seqs", type=int, help="number of sequences in each workers shuffle buffer", default='4')
     ap.add_argument("--hdf5", action='store_true', help="Load data from HDF5 file") 
     ap.add_argument("--causal", action='store_true', help="Use only previous frames")     
@@ -305,14 +306,18 @@ def calculate_loss(outputs, targets, target_idx=0):
 
     return total_loss
 
-def calculate_error(outputs, targets, errors, dataset, target_idx, model):
+def calculate_error(outputs, targets, dataset, target_idx, model):
     bs, t = targets[f'left_pose'].shape[:2]
+
+    metrics = {}
 
     if not isinstance(outputs, dict):
         left_pose_err, right_pose_err = calculate_pose_loss(outputs, targets, target_idx, mode='error')
-        errors['left_pose_err'].update(left_pose_err, bs)
-        errors['right_pose_err'].update(right_pose_err, bs)
-        return errors
+
+        metrics['left_pose_err'] = left_pose_err
+        metrics['right_pose_err'] = right_pose_err
+
+        return metrics
 
     # Calculate hand mesh error
     cam_ext = targets['cam_ext'].unsqueeze(1).view(bs * t, 4, 4)
@@ -321,7 +326,6 @@ def calculate_error(outputs, targets, errors, dataset, target_idx, model):
         mano_gt = [targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']]
         mano_pred = [outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']]
 
-        # mano_gt[1] = mano_gt[1].unsqueeze(1).repeat(1, t, 1)
         mano_pred[1] = mano_pred[1].unsqueeze(1).repeat(1, t, 1)
 
         for i in range(len(mano_gt)):
@@ -334,19 +338,15 @@ def calculate_error(outputs, targets, errors, dataset, target_idx, model):
         mesh_gt = mesh_gt.view(bs, t, -1, 3)
         mesh_pred = mesh_pred.view(bs, t, -1, 3)
 
-        # pose_gt = targets[f'{side}_pose3d']#.view(bs, t, -1, 3)
-        # pose_pred = outputs[f'{side}_pose3d']#.view(bs, t, -1, 3)
-        # print(pose_gt.shape, pose_pred.shape)
-
         pose_gt = pose_gt.view(bs, t, -1, 3)
         pose_pred = pose_pred.view(bs, t, -1, 3)
 
-        # print(pose_gt.shape, mesh_gt.shape)
         # Calculate hand mesh error for only the middle frame or the last frame
         mesh_err = mpjpe(mesh_pred[:, target_idx], mesh_gt[:, target_idx]) * 1000
         pose_err = mpjpe(pose_pred[:, target_idx], pose_gt[:, target_idx]) * 1000
-        errors[f'{side}_mesh_err'].update(mesh_err.item(), bs)
-        errors[f'{side}_pose_err'].update(pose_err.item(), bs)
+
+        metrics[f'{side}_mesh_err'] = mesh_err
+        metrics[f'{side}_pose_err'] = pose_err
 
     obj_pose, obj_class = outputs['obj_pose'], outputs['obj_class']
 
@@ -354,7 +354,7 @@ def calculate_error(outputs, targets, errors, dataset, target_idx, model):
     pred_labels = torch.argmax(obj_class, dim=1)
     pred_object_names = [dataset.object_names[l] for l in pred_labels]
     acc = (pred_labels == targets['label'][:, 0]).float().mean()
-    errors['obj_acc'].update(acc, bs)
+    metrics['obj_acc'] = acc
 
     # Calculate object mesh error
     obj_pred = obj_pose[:, :, :1], obj_pose[:, :, 1:4], obj_pose[:, :, 4:]
@@ -371,13 +371,21 @@ def calculate_error(outputs, targets, errors, dataset, target_idx, model):
             if obj_verts_pred[part].shape[1] != obj_verts_gt[part].shape[1]:
                 continue
             obj_mesh_err = mpjpe(obj_verts_pred[part][target_idx], obj_verts_gt[part][target_idx]) * 1000
-            errors[f'{part}_obj_err'].update(obj_mesh_err.item(), 1)
+            metrics[f'{part}_obj_err'] = metrics[f'{part}_obj_err'] + obj_mesh_err if f'{part}_obj_err' in metrics.keys else obj_mesh_err
 
-    return errors
+    return metrics
 
-def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model, logger, e, device):
+def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model, logger, e, device, dh=None):
 
-    for _, data_dict in tqdm(enumerate(valloader), total=val_count // batch_size):
+    keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
+    errors = {k: AverageMeter() for k in keys}
+    
+    master_condition = dh is None or (dh is not None and dh.is_master)
+    total_samples = val_count // batch_size if dh is None else val_count // (batch_size * dh.world_size)
+
+    iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
+
+    for _, data_dict in iterable_loader:
         if data_dict is None: continue
 
         for k in data_dict.keys():
@@ -385,8 +393,10 @@ def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model
         data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
 
         outputs = model(data_dict)
-        calculate_error(outputs, data_dict, errors, dataset, target_idx, model)
-    
-    error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
-    logger.info(f'epoch {e+1} val: {error_list}')
+        metrics = calculate_error(outputs, data_dict, dataset, target_idx, model)
+        if dh is not None: dh.sync_distributed_values(metrics) # For multi-GPU training
 
+        if master_condition:
+            for k in metrics.keys():
+                errors[k].update(metrics[k].item(), batch_size)
+    return errors
