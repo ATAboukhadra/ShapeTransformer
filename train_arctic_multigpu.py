@@ -41,7 +41,7 @@ else:
 model = dh.wrap_model_for_ddp(model)
 
 num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-logger.info(f'total number of parameters: {num_params}')
+if dh.is_master: logger.info(f'total number of parameters: {num_params}')
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
@@ -51,7 +51,8 @@ for e in range(args.epochs):
 
     errors = {k: AverageMeter() for k in keys}
     total_count = train_count // (args.batch_size * dh.world_size)
-    for i, data_dict in tqdm(enumerate(trainloader), total=total_count):
+    loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
+    for i, data_dict in loader:
         if data_dict is None: continue
 
         data_dict['rgb'] = [img_batch.to(dh.local_rank) for img_batch in data_dict['rgb']]

@@ -33,10 +33,11 @@ class ArcticDataset(Dataset):
         self.hand_faces = {'right': faces_right, 'left': faces_left}
 
         # self.hand_detector = init_hand_kp_model()
-        self.annotations = zipfile.ZipFile(os.path.join(self.root, 'raw_seqs.zip'))
-        self.prefetch_annotations()
-        self.meta_archive = zipfile.ZipFile(os.path.join(self.root, 'meta.zip'))
-        self.meta = json.load(self.meta_archive.open('meta/misc.json'))
+        annotations = zipfile.ZipFile(os.path.join(self.root, 'raw_seqs.zip'))
+        self.prefetch_annotations(annotations)
+        meta_archive = zipfile.ZipFile(os.path.join(self.root, 'meta.zip'))
+        with meta_archive.open('meta/misc.json') as f:
+            self.meta = json.load(f)
         self.objects_root = objects_root
         self.device = device
         self.objects = {name: {} for name in os.listdir(objects_root)}
@@ -64,28 +65,26 @@ class ArcticDataset(Dataset):
                         self.dataset_keys.append('/'.join([subject, seq, camera, frame]))
 
     def load_objects(self):
-        sampled_indices = np.arange(0, 300, 300 // self.num_kps_obj)
         for obj in self.objects.keys():
             for part in ['bottom', 'top']:
                 verts, faces, aux = load_obj(os.path.join(self.objects_root, obj, f'{part}.obj'), device=self.device)
                 tex = self.create_texture(faces, aux)
-                self.objects[obj][part] = (verts, faces, tex)
+                self.objects[obj][part] = (verts, faces.verts_idx, tex)
                 keypoints = json.load(open(os.path.join(self.objects_root, obj, f'{part}_keypoints_300.json')))['keypoints']
-                keypoints = torch.tensor(keypoints)#[:self.num_kps_obj]
+                keypoints = torch.tensor(keypoints)
                 self.object_keypoints[obj][part] = keypoints
 
 
-    def prefetch_annotations(self):
-        print('Prefetching Annotations ..', flush=True)
+    def prefetch_annotations(self, annotations):
 
         self.ego_annotations_dict = {}
         self.hand_annotations_dict = {}
         self.obj_annotations_dict = {}
 
-        for file in self.annotations.filelist:
+        for file in annotations.filelist:
             if 'smpl' in file.filename: continue
             key = file.filename
-            with self.annotations.open(file, 'r') as f:
+            with annotations.open(file, 'r') as f:
                 if 'mano' in key:
                     self.hand_annotations_dict[key] = np.load(f, allow_pickle=True).item()
                 elif 'object' in key:

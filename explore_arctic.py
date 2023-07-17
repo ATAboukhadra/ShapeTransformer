@@ -85,7 +85,7 @@ for i, data_dict in tqdm(enumerate(trainloader), total=num_samples // batch_size
             else:
                 verts = obj_verts[mesh][i].unsqueeze(0).to(device)
 
-            faces = dataset.objects[object_name][mesh][1].verts_idx if mesh in ['top', 'bottom'] else torch.tensor(hand_faces[mesh], device=device)
+            faces = dataset.objects[object_name][mesh][1] if mesh in ['top', 'bottom'] else torch.tensor(hand_faces[mesh], device=device)
             texture = dataset.objects[object_name][mesh][2] if mesh in ['top', 'bottom'] else None
             verts_list.append(verts)
             faces_list.append(faces)
