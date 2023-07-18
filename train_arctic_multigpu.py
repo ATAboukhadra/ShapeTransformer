@@ -49,8 +49,8 @@ for e in range(args.epochs):
 
     errors = {k: AverageMeter() for k in keys}
     total_count = train_count // (args.batch_size * dh.world_size)
-    # loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
-    loader = enumerate(trainloader)
+    loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
+    # loader = enumerate(trainloader)
     for i, data_dict in loader:
         if data_dict is None: continue
 
