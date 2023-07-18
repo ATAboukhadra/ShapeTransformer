@@ -370,7 +370,7 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
             if obj_verts_pred[part].shape[1] != obj_verts_gt[part].shape[1]:
                 continue
             obj_mesh_err = mpjpe(obj_verts_pred[part][target_idx], obj_verts_gt[part][target_idx]) * 1000
-            metrics[f'{part}_obj_err'] = metrics[f'{part}_obj_err'] + obj_mesh_err if f'{part}_obj_err' in metrics.keys else obj_mesh_err
+            metrics[f'{part}_obj_err'] = metrics[f'{part}_obj_err'] + obj_mesh_err if f'{part}_obj_err' in metrics.keys() else obj_mesh_err
 
     return metrics
 
