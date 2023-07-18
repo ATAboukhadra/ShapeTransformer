@@ -66,7 +66,7 @@ for e in range(args.epochs):
         loss.backward()
         optimizer.step()
         
-        metrics = calculate_error(outputs, data_dict, dataset, target_idx, model)
+        metrics = calculate_error(outputs, data_dict, dataset, target_idx, model.module)
         dh.sync_distributed_values(metrics)
         if dh.is_master:
             for k in metrics.keys():

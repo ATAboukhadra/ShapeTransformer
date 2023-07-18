@@ -17,9 +17,9 @@ class DistributedHelper:
                 "conf", "logger", "train_summary_writer", "val_summary_writer"
 
     def __init__(self, backend: str = "nccl"):
-
-        dist.init_process_group(backend)
-        mp.set_start_method("forkserver")
+        if dist.is_available():
+            dist.init_process_group(backend)
+        # mp.set_start_method("forkserver")
 
         self.is_distributed = dist.is_initialized()
         self.world_size = int(os.environ["WORLD_SIZE"]) if self.is_distributed else 1

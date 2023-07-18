@@ -40,7 +40,6 @@ def parse_args():
     ap.add_argument("--skip", type=int, help="how many frames to jump", default='1')
     ap.add_argument("--d_model", type=int, help="number of features in transformer", default='32')
     ap.add_argument("--num_workers", type=int, help="number of workers", default='8')
-    ap.add_argument("--num_gpus", type=int, help="number of GPUs", default='1')
     ap.add_argument("--num_seqs", type=int, help="number of sequences in each workers shuffle buffer", default='4')
     ap.add_argument("--hdf5", action='store_true', help="Load data from HDF5 file") 
     ap.add_argument("--causal", action='store_true', help="Use only previous frames")     
@@ -393,7 +392,9 @@ def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model
         data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
 
         outputs = model(data_dict)
-        metrics = calculate_error(outputs, data_dict, dataset, target_idx, model)
+
+        model_obj = model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
+        metrics = calculate_error(outputs, data_dict, dataset, target_idx, model_obj)
         if dh is not None: dh.sync_distributed_values(metrics) # For multi-GPU training
 
         if master_condition:
