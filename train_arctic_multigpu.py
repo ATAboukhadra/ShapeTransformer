@@ -67,8 +67,9 @@ def main():
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            
-            metrics = calculate_error(outputs, data_dict, dataset, target_idx, model.module)
+
+            with torch.no_grad():
+                metrics = calculate_error(outputs, data_dict, dataset, target_idx, model.module)
             dh.sync_distributed_values(metrics)
             if dh.is_master:
                 for k in metrics.keys():
