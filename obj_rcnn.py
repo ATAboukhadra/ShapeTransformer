@@ -8,7 +8,7 @@ import os
 
 root = '/ds-av/public_datasets/arctic/td/p1_sequential_nocropped/'
 objects_root = 'dataset/arctic_objects'
-output_folder = 'output/arctic_obj_rcnn/'
+output_folder = '/checkpoints/arctic_obj_rcnn/'
 if not os.path.exists(output_folder): os.mkdir(output_folder)
 
 batch_size = 4
@@ -26,7 +26,6 @@ val_pipeline, val_count, _, _ = create_pipe(root, objects_root, 'val', torch.dev
 valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=batch_size, num_workers=num_workers, pin_memory=False, collate_fn=temporal_batching)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-
 
 for e in range(epochs):
 
@@ -48,6 +47,7 @@ for e in range(epochs):
 
         if (i+1) % 1000 == 0:
             print(i+1, [(k, round(losses_counters[k].avg, 2)) for k in losses.keys()])
+            torch.save(model.state_dict(), f'{output_folder}keypointrcnn_resnet50_fpn_{e}.pth')
             for k in losses.keys():
                 losses_counters[k].reset()
     
