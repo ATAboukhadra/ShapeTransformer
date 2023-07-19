@@ -44,7 +44,7 @@ def parse_args():
     ap.add_argument("--num_seqs", type=int, help="number of sequences in each workers shuffle buffer", default='4')
     ap.add_argument("--hdf5", action='store_true', help="Load data from HDF5 file") 
     ap.add_argument("--causal", action='store_true', help="Use only previous frames")     
-    ap.add_argument("--weights", type=str, help="path to pretrained weights")     
+    ap.add_argument("--weights", type=str, default='', help="path to pretrained weights")     
 
     return ap.parse_args()
 

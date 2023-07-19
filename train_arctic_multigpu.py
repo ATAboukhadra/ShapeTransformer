@@ -38,8 +38,10 @@ def main():
     else:
         model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2)
 
-    if dh.is_master: logger.info(f'Loading model from {args.weights} if exists')
-    model = load_model(model, args.weights)
+    if args.weights:
+        if dh.is_master: 
+            logger.info(f'Loading model from {args.weights} if exists')
+        model = load_model(model, args.weights)
     model = dh.wrap_model_for_ddp(model)
 
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
