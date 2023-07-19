@@ -21,7 +21,7 @@ device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 model = torchvision.models.detection.keypointrcnn_resnet50_fpn(num_keypoints=30, num_classes=22).to(device)
 
 train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', 'cpu', sliding_window_size, num_seqs)
-trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=0, collate_fn=temporal_batching)
+trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=num_workers, collate_fn=temporal_batching)
 val_pipeline, val_count, _, _ = create_pipe(root, objects_root, 'val', torch.device('cpu'), sliding_window_size, num_seqs, factory=factory, arctic_decoder=decoder)
 valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=batch_size, num_workers=num_workers, pin_memory=False, collate_fn=temporal_batching)
 
