@@ -415,8 +415,10 @@ def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model
     return errors
 
 def load_model(model, weights_path):
+    start_epoch = 0
     if os.path.isfile(weights_path):
         checkpoint = torch.load(weights_path)
         model.load_state_dict(checkpoint)
-    
-    return model
+        start_epoch = int(weights_path.split('/')[-1].split('_')[-1].split('.')[0]) + 1
+
+    return model, start_epoch

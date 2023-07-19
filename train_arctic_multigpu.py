@@ -38,10 +38,11 @@ def main():
     else:
         model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2)
 
+    start_epoch = 0
     if args.weights:
         if dh.is_master: 
             logger.info(f'Loading model from {args.weights} if exists')
-        model = load_model(model, args.weights)
+        model, start_epoch = load_model(model, args.weights)
     model = dh.wrap_model_for_ddp(model)
 
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -51,7 +52,7 @@ def main():
 
     keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
 
-    for e in range(args.epochs):
+    for e in range(start_epoch, args.epochs):
 
         errors = {k: AverageMeter() for k in keys}
         total_count = train_count // (args.batch_size * dh.world_size)
