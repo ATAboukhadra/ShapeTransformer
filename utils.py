@@ -416,7 +416,6 @@ def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model
 
 def load_model(model, weights_path):
     if os.path.isfile(weights_path):
-        print(f'Loading model from {weights_path}')
         checkpoint = torch.load(weights_path)
         model.load_state_dict(checkpoint)
     
