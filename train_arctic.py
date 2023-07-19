@@ -37,6 +37,7 @@ if args.model_name == 'stohrmer':
 else:
     model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2).to(device)
 
+logger.info(f'Loading model from {args.weights}')
 model = load_model(model, args.weights)
 
 num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
