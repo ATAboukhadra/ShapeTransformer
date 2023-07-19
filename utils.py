@@ -14,6 +14,7 @@ from pytorch3d.structures.meshes import Meshes
 from pytorch3d.io import load_obj
 from manopth.manolayer import ManoLayer
 from tqdm import tqdm
+from pytorch3d.loss import chamfer_distance
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 data_path = '/home2/HO3D_v3'
@@ -43,7 +44,7 @@ def parse_args():
     ap.add_argument("--num_seqs", type=int, help="number of sequences in each workers shuffle buffer", default='4')
     ap.add_argument("--hdf5", action='store_true', help="Load data from HDF5 file") 
     ap.add_argument("--causal", action='store_true', help="Use only previous frames")     
-    ap.add_argument("--pretrained_model", type=str, help="path to pretrained weights")     
+    ap.add_argument("--weights", type=str, help="path to pretrained weights")     
 
     return ap.parse_args()
 
@@ -368,13 +369,18 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
         obj_verts_gt, _ = dataset.transform_obj(pred_object_names[i], obj_gt[0][i], obj_gt[1][i], obj_gt[2][i], cam_ext_i)
         for part in ['top', 'bottom']:
             if obj_verts_pred[part].shape[1] != obj_verts_gt[part].shape[1]:
-                continue
-            obj_mesh_err = mpjpe(obj_verts_pred[part][target_idx], obj_verts_gt[part][target_idx]) * 1000
+                # Calculate chamfer distance in case of wrong classification
+                obj_mesh_err = chamfer_distance(obj_verts_pred[part][target_idx].unsqueeze(0), obj_verts_gt[part][target_idx].unsqueeze(0))[0] * 1000
+            else:
+                obj_mesh_err = mpjpe(obj_verts_pred[part][target_idx], obj_verts_gt[part][target_idx]) * 1000
+
             metrics[f'{part}_obj_err'] = metrics[f'{part}_obj_err'] + obj_mesh_err if f'{part}_obj_err' in metrics.keys() else obj_mesh_err
 
     return metrics
 
 def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model, logger, e, device, dh=None):
+
+    logger.info(f'Running validation for epoch {e}')
 
     keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
     errors = {k: AverageMeter() for k in keys}
@@ -382,9 +388,10 @@ def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model
     master_condition = dh is None or (dh is not None and dh.is_master)
     total_samples = val_count // batch_size if dh is None else val_count // (batch_size * dh.world_size)
 
-    iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
+    # iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
+    iterable_loader = enumerate(valloader)
 
-    for _, data_dict in iterable_loader:
+    for i, data_dict in iterable_loader:
         if data_dict is None: continue
 
         for k in data_dict.keys():
@@ -393,11 +400,23 @@ def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model
 
         outputs = model(data_dict)
 
+        # if master_condition:
         model_obj = model.module if isinstance(model, torch.nn.parallel.DistributedDataParallel) else model
         metrics = calculate_error(outputs, data_dict, dataset, target_idx, model_obj)
         if dh is not None: dh.sync_distributed_values(metrics) # For multi-GPU training
 
-        if master_condition:
-            for k in metrics.keys():
-                errors[k].update(metrics[k].item(), batch_size)
+        for k in metrics.keys():
+            errors[k].update(metrics[k].item(), batch_size)
+
+        if (i+1) % 1000 == 0 and master_condition:
+            logger.info(f'Validation: [{i+1}/{total_samples}]')
+
     return errors
+
+def load_model(model, weights_path):
+    if os.path.isfile(weights_path):
+        print(f'Loading model from {weights_path}')
+        checkpoint = torch.load(weights_path)
+        model.load_state_dict(checkpoint)
+    
+    return model

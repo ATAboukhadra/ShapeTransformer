@@ -7,7 +7,7 @@ from dataset.arctic_pipeline import create_pipe, temporal_batching
 from tqdm import tqdm
 from models.Stohrmer import Stohrmer
 import os
-from utils import AverageMeter, parse_args, create_logger, calculate_loss, calculate_error, run_val
+from utils import AverageMeter, parse_args, create_logger, calculate_loss, calculate_error, run_val, load_model
 from tqdm import tqdm
 from models.model_poseformer import PoseTransformer
 from datapipes.utils.collation_functions import collate_batch_as_tuples
@@ -36,6 +36,8 @@ if args.model_name == 'stohrmer':
     model = Stohrmer(device, num_kps=42, num_frames=args.window_size).to(device)
 else:
     model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2).to(device)
+
+model = load_model(model, args.weights)
 
 num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 logger.info(f'total number of parameters: {num_params}')
@@ -75,7 +77,8 @@ for e in range(args.epochs):
             errors = {k: AverageMeter() for k in keys}
 
         if (i+1) % args.val_interval == 0:
-            errors = run_val(valloader, val_count, args.batch_size, errors, dataset, target_idx, model, logger, e, device)  
+            with torch.no_grad():
+                errors = run_val(valloader, val_count, args.batch_size, errors, dataset, target_idx, model, logger, e, device)  
             error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]  
             logger.info(f'\nepoch {e} val err: {error_list}')
             torch.save(model.state_dict(), f'{args.output_folder}/model_{e}.pth')
