@@ -382,7 +382,7 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
 
 def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger, e, device, dh=None):
 
-    logger.info(f'Running validation for epoch {e}')
+    if dh.is_master: logger.info(f'Running validation for epoch {e}')
 
     keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
     errors = {k: AverageMeter() for k in keys}
