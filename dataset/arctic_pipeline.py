@@ -7,6 +7,7 @@ from argparse import ArgumentParser
 from torchdata.datapipes.iter import IterDataPipe
 
 from datapipes.sequence_pipeline import SequencePipelineCreator
+from datapipes.base_pipeline import BasePipelineCreator
 from datapipes.utils.dispatcher import Dispatcher
 from datapipes.utils.remove_wrapper import remove_wrapper
 from datapipes.decoders.image_decoder import ImageDecoder

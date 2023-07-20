@@ -43,6 +43,13 @@ def main():
         if dh.is_master: 
             logger.info(f'Loading model from {args.weights} if exists')
         model, start_epoch = load_model(model, args.weights)
+    
+    if args.run_val:
+        errors = run_val(valloader, val_count, args.batch_size, errors, dataset, target_idx, model, logger, e, dh.local_rank, dh)
+        if dh.is_master:
+            error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
+            logger.info(f'\n[{i+1} / {total_count}]: {error_list}')
+
     model = dh.wrap_model_for_ddp(model)
 
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -56,7 +63,7 @@ def main():
 
         errors = {k: AverageMeter() for k in keys}
         total_count = train_count // (args.batch_size * dh.world_size)
-        loader = enumerate(trainloader)
+        loader = tqdm(enumerate(trainloader), total=train_count // args.batch_size) if dh.is_master else enumerate(trainloader)
         for i, data_dict in loader:
             if data_dict is None: continue
 
@@ -84,8 +91,10 @@ def main():
                 error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
                 logger.info(f'\n[{i+1} / {total_count}]: {error_list}')
                 errors = {k: AverageMeter() for k in keys}
+                torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
         if dh.is_master:
+            logger.info(f'Saving model at epoch {e}')
             torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
         errors = run_val(valloader, val_count, args.batch_size, errors, dataset, target_idx, model, logger, e, dh.local_rank, dh)
