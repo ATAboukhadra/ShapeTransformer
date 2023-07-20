@@ -390,9 +390,8 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     master_condition = dh is None or (dh is not None and dh.is_master)
     total_samples = val_count // batch_size if dh is None else val_count // (batch_size * dh.world_size)
 
-    # iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
-    iterable_loader = enumerate(valloader)
-
+    iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
+    
     for i, data_dict in iterable_loader:
         if data_dict is None: continue
 
