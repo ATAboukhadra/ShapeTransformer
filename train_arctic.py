@@ -80,9 +80,9 @@ for e in range(start_epoch, args.epochs):
             errors = {k: AverageMeter() for k in keys}
 
         if (i+1) % args.val_interval == 0:
+            torch.save(model.state_dict(), f'{args.output_folder}/model_{e}.pth')
             with torch.no_grad():
                 errors = run_val(valloader, val_count, args.batch_size, errors, dataset, target_idx, model, logger, e, device)  
             error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]  
             logger.info(f'\nepoch {e} val err: {error_list}')
-            torch.save(model.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
