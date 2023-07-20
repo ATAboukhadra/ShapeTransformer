@@ -45,7 +45,7 @@ def main():
         model, start_epoch = load_model(model, args.weights)
     
     if args.run_val:
-        errors = run_val(valloader, val_count, args.batch_size, errors, dataset, target_idx, model, logger, e, dh.local_rank, dh)
+        errors = run_val(valloader, val_count, args.batch_size, dataset, target_idx, model, logger, e, dh.local_rank, dh)
         if dh.is_master:
             error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
             logger.info(f'\n[{i+1} / {total_count}]: {error_list}')
@@ -97,10 +97,12 @@ def main():
             logger.info(f'Saving model at epoch {e}')
             torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
-        errors = run_val(valloader, val_count, args.batch_size, errors, dataset, target_idx, model, logger, e, dh.local_rank, dh)
+        errors = run_val(valloader, val_count, args.batch_size, dataset, target_idx, model, logger, e, dh.local_rank, dh)
         if dh.is_master:
             error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
             logger.info(f'\n[{i+1} / {total_count}]: {error_list}')
+            errors = {k: AverageMeter() for k in keys}
+
 
 if __name__ == '__main__':
     main()

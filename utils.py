@@ -380,7 +380,7 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
 
     return metrics
 
-def run_val(valloader, val_count, batch_size, errors, dataset, target_idx, model, logger, e, device, dh=None):
+def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger, e, device, dh=None):
 
     logger.info(f'Running validation for epoch {e}')
 
