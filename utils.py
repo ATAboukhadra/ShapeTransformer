@@ -16,15 +16,15 @@ from manopth.manolayer import ManoLayer
 from tqdm import tqdm
 from pytorch3d.loss import chamfer_distance
 
-device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-data_path = '/home2/HO3D_v3'
-cam_intr = torch.tensor([
-  [614.627,   0.,    320.262],
- [  0. ,   614.101 ,238.469],
- [  0. ,     0. ,     1.   ]] 
-, device=device
- )
-mano_layer = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=True, use_pca=False).to(device)
+# device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
+# data_path = '/home2/HO3D_v3'
+# cam_intr = torch.tensor([
+#   [614.627,   0.,    320.262],
+#  [  0. ,   614.101 ,238.469],
+#  [  0. ,     0. ,     1.   ]] 
+# , device=device
+#  )
+# mano_layer = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=True, use_pca=False).to(device)
 
 def parse_args():
     
@@ -395,9 +395,10 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     for i, data_dict in iterable_loader:
         if data_dict is None: continue
 
+        data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
+
         for k in data_dict.keys():
             data_dict[k] = data_dict[k].to(device) if isinstance(data_dict[k], torch.Tensor) else data_dict[k]
-        data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
 
         outputs = model(data_dict)
 
