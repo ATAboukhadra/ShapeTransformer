@@ -20,9 +20,9 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 class ArcticDataset(Dataset):
-    def __init__(self, root, objects_root, device, iterable=False):
+    def __init__(self, root, objects_root, device, mode, iterable=False):
         self.root = root
-        
+        self.mode = mode
         mano_layer_right = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=False, use_pca=False).to(device)
         faces_right = mano_layer_right.th_faces.cpu().detach().numpy()
 
@@ -105,11 +105,10 @@ class ArcticDataset(Dataset):
         cam_int[0, 2], cam_int[1, 2] = cx, cy
         return cam_int
 
-    def load_camera_matrix(self, subject, seq_name, camera, frame_num):
+    def load_camera_matrix(self, subject, seq_name, camera, frame_num, valid):
         ego_annotations_path = os.path.join('raw_seqs', subject, seq_name+f'.egocam.dist.npy')
         
         self.total += 1
-        valid = True
 
         if ego_annotations_path not in self.ego_annotations_dict.keys():
             ego_annotations = {}
@@ -283,12 +282,17 @@ class ArcticDataset(Dataset):
     def get_anno(self, key):
         subject, seq_name, camera, frame = key.split('/')
         camera_num = int(camera)
+        # print(camera_num, self.mode)
+        valid = True
+        if (self.mode == 'allocentric' and camera_num == 0) or (self.mode == 'egocentric' and camera_num != 0):
+            valid = False
+        
         frame_num = int(frame.split('.')[0]) - 1
         obj = seq_name.split('_')[0]
         
         # _, pose2d, _, _, _ = detect_hand(img, detector=self.hand_detector)
         # pose2d = torch.zeros((2, 21, 2))
-        cam_ext, cam_int, valid = self.load_camera_matrix(subject, seq_name, camera_num, frame_num)
+        cam_ext, cam_int, valid = self.load_camera_matrix(subject, seq_name, camera_num, frame_num, valid)
         hand_dict, valid = self.load_hand_annotations(subject, seq_name, frame_num, cam_ext, cam_int, valid)
         obj_dict, valid = self.load_obj_annotations(subject, seq_name, frame_num, cam_ext, cam_int, obj, valid)
 

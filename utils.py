@@ -31,6 +31,7 @@ def parse_args():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data_root", type=str, help="Directory containing data", default='/data/ho')
     ap.add_argument("--meta_root", type=str, help="Directory containing additional data", default='/data/DexYCB')
+    ap.add_argument("--mode", type=str, help="Cameras to be included (all, allocentric, egocentric)", default='all')
     ap.add_argument("--output_folder", type=str, help="relative path to save checkpoint", default='checkpoints/transformer')
     ap.add_argument("--batch_size", type=int, help="batch size", default='8')
     ap.add_argument("--model_name", type=str, help="name of the model", default='stohrmer')
@@ -411,7 +412,7 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
             errors[k].update(metrics[k].item(), batch_size)
 
         if (i+1) % 1000 == 0 and master_condition:
-            logger.info(f'Validation: [{i+1}/{total_samples}]')
+            logger.info(f'\nValidation: [{i+1}/{total_samples}]')
 
     return errors
 

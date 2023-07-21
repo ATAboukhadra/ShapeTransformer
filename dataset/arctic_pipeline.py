@@ -20,8 +20,8 @@ from torchvision.transforms.functional import resize
 from datapipes.utils.dataset_path_utils import get_component_name
 
 class ArcticDecoder():
-    def __init__(self, root, objects_root, device):
-        self.dataset = ArcticDataset(root, objects_root, device, iterable=True)
+    def __init__(self, root, objects_root, device, mode='all'):
+        self.dataset = ArcticDataset(root, objects_root, device, mode, iterable=True)
     
     def __call__(self, subset_id, seq_id, sample_id):
         splits = seq_id.split('_')
@@ -91,7 +91,7 @@ def decode_dataset(pipe: IterDataPipe, root, objects_root, device, arctic_decode
     # pipe = pipe.map(fn=arctic_decoder)
     return pipe
 
-def create_pipe(in_dir, objects_root, subset, device, sliding_window_size, num_seqs, factory=None, arctic_decoder=None):
+def create_pipe(in_dir, objects_root, subset, mode, device, sliding_window_size, num_seqs, factory=None, arctic_decoder=None):
 
     # Make sure to create the factory only once. It reads the metadata file at construction time.
     if factory is None: factory = SequencePipelineCreator(in_dir)
@@ -106,8 +106,8 @@ def create_pipe(in_dir, objects_root, subset, device, sliding_window_size, num_s
     shuffle_buffer_size = num_seqs # This is now the number of sequences in the buffer
 
     # Using the metadata created in the conversion process, the streaming pipeline can be created automatically.
-    arctic_decoder = ArcticDecoder(in_dir, objects_root, device) if arctic_decoder is None else arctic_decoder
-    pipe = factory.create_datapipe(subset, shuffle_buffer_size, shuffle_shards=subset == "train", temporal_sliding_window_size=sliding_window_size, add_component_fn=arctic_decoder)
+    arctic_decoder = ArcticDecoder(in_dir, objects_root, device, mode) if arctic_decoder is None else arctic_decoder
+    pipe = factory.create_datapipe(subset, shuffle_buffer_size, shuffle_shards=True, temporal_sliding_window_size=sliding_window_size, add_component_fn=arctic_decoder if subset in ['train', 'val'] else None)
     # Decode the components of the dataset. Placing it in a function makes it reusable.
     pipe = decode_dataset(pipe, in_dir, objects_root, device, arctic_decoder)
     # pipe = factory.add_temporal_windowing_and_shuffling(pipe)
