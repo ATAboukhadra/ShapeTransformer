@@ -53,7 +53,7 @@ def main():
             errors = run_val(valloader, val_count, args.batch_size, dataset, target_idx, model, logger, start_epoch, dh.local_rank, dh)
         if dh.is_master:
             error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
-            logger.info(f'\n[{i+1} / {total_count}]: {error_list}')
+            logger.info(f'\nEpoch {start_epoch-1} Val Err: {error_list}')
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
@@ -100,7 +100,7 @@ def main():
         errors = run_val(valloader, val_count, args.batch_size, dataset, target_idx, model, logger, e, dh.local_rank, dh)
         if dh.is_master:
             error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
-            logger.info(f'\n[{i+1} / {total_count}]: {error_list}')
+            logger.info(f'\nEpoch {e} Val Err: {error_list}')
             errors = {k: AverageMeter() for k in keys}
 
 
