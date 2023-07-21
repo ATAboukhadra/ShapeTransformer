@@ -23,10 +23,10 @@ target_idx = args.window_size-1 if args.causal else args.window_size // 2
 if not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
 logger = create_logger(args.output_folder)
 
-train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', torch.device('cpu'), args.window_size, args.num_seqs)
+train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', args.mode, 'cpu', args.window_size, args.num_seqs)
 trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=temporal_batching)
 
-val_pipeline, val_count, _, _ = create_pipe(args.data_root, args.meta_root, 'val', torch.device('cpu'), args.window_size, args.num_seqs, factory=factory, arctic_decoder=decoder)
+val_pipeline, val_count, _, _ = create_pipe(args.data_root, args.meta_root, 'val', args.mode, 'cpu', args.window_size, args.num_seqs, factory=factory, arctic_decoder=decoder)
 valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=temporal_batching)
 
 dataset = decoder.dataset
