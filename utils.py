@@ -383,7 +383,6 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
 
 def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger, e, device, dh=None):
 
-    if dh.is_master: logger.info(f'Running validation for epoch {e}')
 
     keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
     errors = {k: AverageMeter() for k in keys}
@@ -391,6 +390,7 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     master_condition = dh is None or (dh is not None and dh.is_master)
     total_samples = val_count // batch_size if dh is None else val_count // (batch_size * dh.world_size)
 
+    if master_condition: logger.info(f'Running validation for epoch {e}')
     iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
     
     for i, data_dict in iterable_loader:
