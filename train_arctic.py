@@ -76,7 +76,7 @@ for e in range(start_epoch, args.epochs):
 
         if (i+1) % args.log_interval == 0:
             error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
-            logger.info(f'\n[{i+1} / {train_count // args.batch_size}]: {error_list}')
+            logger.info(f'\nEpoch {e} [{i+1} / {train_count // args.batch_size}]: {error_list}')
             errors = {k: AverageMeter() for k in keys}
 
         if (i+1) % args.val_interval == 0:
