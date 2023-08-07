@@ -15,7 +15,7 @@ from pytorch3d.io import load_obj
 from manopth.manolayer import ManoLayer
 from tqdm import tqdm
 from pytorch3d.loss import chamfer_distance
-
+from multiprocessing import Value
 # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 # data_path = '/home2/HO3D_v3'
 # cam_intr = torch.tensor([
@@ -43,6 +43,7 @@ def parse_args():
     ap.add_argument("--d_model", type=int, help="number of features in transformer", default='32')
     ap.add_argument("--num_workers", type=int, help="number of workers", default='8')
     ap.add_argument("--num_seqs", type=int, help="number of sequences in each workers shuffle buffer", default='4')
+    ap.add_argument("--num_gpus", type=int, help="number of gpus to be used in multigpu case", default='1')
     ap.add_argument("--run_val", action='store_true', help="run validation epoch once before training")
     ap.add_argument("--hdf5", action='store_true', help="Load data from HDF5 file") 
     ap.add_argument("--causal", action='store_true', help="Use only previous frames")     
@@ -383,7 +384,7 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
 
 def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger, e, device, dh=None):
 
-
+    stop = Value('i', 0)
     keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
     errors = {k: AverageMeter() for k in keys}
     
@@ -413,6 +414,10 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
 
         if (i+1) % 1000 == 0 and master_condition:
             logger.info(f'\nValidation: [{i+1}/{total_samples}]')
+
+        if stop.value: break
+
+    stop.value = 1
 
     return errors
 

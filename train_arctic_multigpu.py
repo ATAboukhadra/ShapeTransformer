@@ -12,6 +12,7 @@ from tqdm import tqdm
 from models.model_poseformer import PoseTransformer
 from multigpu_helpers.dist_helper import DistributedHelper
 from datapipes.utils.collation_functions import collate_sequences_as_dicts
+from multiprocessing import Value
 
 def main():
 
@@ -65,6 +66,8 @@ def main():
         errors = {k: AverageMeter() for k in keys}
         total_count = train_count // (args.batch_size * dh.world_size)
         loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
+        stop = Value('i', 0)
+
         for i, (_, data_dict) in loader:
             if data_dict is None: continue
 
@@ -93,6 +96,15 @@ def main():
                 logger.info(f'\nEpoch {e} [{i+1} / {total_count}]: {error_list}')
                 errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
+            
+            if stop.value == 1: 
+                logger.info(f'Stopping task {dh.local_rank} training')
+                break
+
+            if dh.is_master: break
+
+        logger.info(f'Task {dh.local_rank} finished epoch {e}')
+        stop.value = 1
 
         if dh.is_master:
             logger.info(f'Saving model at epoch {e}')
