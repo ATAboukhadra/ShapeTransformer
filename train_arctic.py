@@ -3,14 +3,14 @@ import torch
 import numpy as np
 from render_utils import create_renderer, render_arctic_mesh
 from vis_utils import showHandJoints
-from dataset.arctic_pipeline import create_pipe, temporal_batching
+from dataset.arctic_pipeline import create_pipe
 from tqdm import tqdm
 from models.Stohrmer import Stohrmer
 import os
 from utils import AverageMeter, parse_args, create_logger, calculate_loss, calculate_error, run_val, load_model
 from tqdm import tqdm
 from models.model_poseformer import PoseTransformer
-from datapipes.utils.collation_functions import collate_batch_as_tuples
+from datapipes.utils.collation_functions import collate_sequences_as_dicts
 
 
 np.set_printoptions(precision=2)
@@ -24,10 +24,10 @@ if not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
 logger = create_logger(args.output_folder)
 
 train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', args.mode, 'cpu', args.window_size, args.num_seqs)
-trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=temporal_batching)
+trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_sequences_as_dicts)
 
 val_pipeline, val_count, _, _ = create_pipe(args.data_root, args.meta_root, 'val', args.mode, 'cpu', args.window_size, args.num_seqs, factory=factory, arctic_decoder=decoder)
-valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=temporal_batching)
+valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_sequences_as_dicts)
 
 dataset = decoder.dataset
 hand_faces = dataset.hand_faces
@@ -55,11 +55,10 @@ keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 't
 for e in range(start_epoch, args.epochs):
 
     errors = {k: AverageMeter() for k in keys}
-    for i, data_dict in tqdm(enumerate(trainloader), total=train_count // args.batch_size):
+    for i, (_, data_dict) in tqdm(enumerate(trainloader), total=train_count // args.batch_size):
         if data_dict is None: continue
 
         data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']] if isinstance(model, Stohrmer) else data_dict['rgb']
-
         for k in data_dict.keys():
             if isinstance(data_dict[k], torch.Tensor):
                 data_dict[k] = data_dict[k].to(device)

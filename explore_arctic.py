@@ -7,6 +7,7 @@ from dataset.arctic_pipeline import create_pipe, temporal_batching
 from tqdm import tqdm
 from torchvision.transforms.functional import resize
 from utils import project_3D_points
+from datapipes.utils.collation_functions import collate_sequences_as_dicts
 
 np.set_printoptions(precision=2)
 
@@ -14,31 +15,29 @@ device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 
 colors = {'right': 'blue', 'left': 'red', 'top': 'green', 'bottom': 'yellow'}
 
-root = '/ds-av/public_datasets/arctic/td/p1_sequential_nocropped/'
+root = '/ds-av/public_datasets/arctic/td/sequential_resized/'
 objects_root = 'dataset/arctic_objects'
-batch_size = 1
-num_workers = 1
+batch_size = 8
+num_workers = 8
 sliding_window_size = 3
-scale_factor = 4
 num_seqs = 16
+mode = 'all'
 
-train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', 'cpu', sliding_window_size, num_seqs)
-trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=0, collate_fn=temporal_batching)
+train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', mode, 'cpu', sliding_window_size, num_seqs)
+trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=0, collate_fn=collate_sequences_as_dicts)
 
-val_pipeline, _, _, _ = create_pipe(root, objects_root, 'val', 'cpu', sliding_window_size, num_seqs, factory=factory, arctic_decoder=decoder)
-valloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=0, collate_fn=temporal_batching)
+val_pipeline, _, _, _ = create_pipe(root, objects_root, 'val', mode, 'cpu', sliding_window_size, num_seqs, factory=factory, arctic_decoder=decoder)
+valloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=0, collate_fn=collate_sequences_as_dicts)
 
 # dataset = ArcticDataset(root, objects_root, device=device)
 dataset = decoder.dataset
 hand_faces = dataset.hand_faces
 
-for i, data_dict in tqdm(enumerate(trainloader), total=num_samples // batch_size):
+for idx, (_, data_dict) in tqdm(enumerate(trainloader), total=num_samples // batch_size):
     articulation = data_dict['obj_pose'][0][0][0]
-    if i < 10 or articulation < 0.1: # or data_dict['img'][0][0].shape[-2:][0] == 700:
+    if idx < 200 or articulation < 0.1: # or data_dict['img'][0][0].shape[-2:][0] == 700:
         continue
-    
     data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
-
     cam_int = data_dict['cam_int'][0][0]
     fx, fy, cx, cy = cam_int[0, 0], cam_int[1, 1], cam_int[0, 2], cam_int[1, 2]
     K = torch.tensor([[[fx, 0, cx, 0], [0, fy, cy, 0], [0, 0, 0, 1], [0, 0, 1, 0]]], device=device)
@@ -57,13 +56,15 @@ for i, data_dict in tqdm(enumerate(trainloader), total=num_samples // batch_size
     cam_ext = data_dict['cam_ext'][0]
     obj_verts, obj_kps = dataset.transform_obj(object_name, articulation, rot, trans, cam_ext)
 
-    obj_kps2d = data_dict['keypoints'][0].view(sliding_window_size, 2, -1, 2).cpu().numpy()
+    obj_kps2d = data_dict['keypoints'][0].view(sliding_window_size, 2, -1, 3).cpu().numpy()
     
     for i in tqdm(range(data_dict['rgb'][0].shape[0])):
         img = data_dict['rgb'][0][i].cpu().numpy().transpose(1, 2, 0)
         img = np.ascontiguousarray(img * 255, np.uint8)
-
-        if data_dict['hands_pose2d'][0][0].shape[0] > 0:
+        # if i == 0:
+        #     plt.imshow(img)
+        #     plt.show()
+        if data_dict['hands_pose2d'][0][i].shape[0] > 0:
             for hand in data_dict['hands_pose2d'][0][i]:
                 img = showHandJoints(img, hand.cpu().numpy())
         plt.subplot(*fig_dim, i+1)

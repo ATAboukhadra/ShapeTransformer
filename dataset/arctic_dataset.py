@@ -20,8 +20,8 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 class ArcticDataset(Dataset):
-    def __init__(self, root, objects_root, device, mode, iterable=False):
-        self.root = root
+    def __init__(self, objects_root, device, mode, iterable=False):
+        self.root = 'dataset/meta/'
         self.mode = mode
         mano_layer_right = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=False, use_pca=False).to(device)
         faces_right = mano_layer_right.th_faces.cpu().detach().numpy()

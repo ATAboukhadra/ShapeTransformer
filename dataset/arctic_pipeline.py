@@ -20,8 +20,8 @@ from torchvision.transforms.functional import resize
 from datapipes.utils.dataset_path_utils import get_component_name
 
 class ArcticDecoder():
-    def __init__(self, root, objects_root, device, mode='all'):
-        self.dataset = ArcticDataset(root, objects_root, device, mode, iterable=True)
+    def __init__(self, objects_root, device, mode='all'):
+        self.dataset = ArcticDataset(objects_root, device, mode, iterable=True)
     
     def __call__(self, subset_id, seq_id, sample_id):
         splits = seq_id.split('_')
@@ -45,50 +45,19 @@ class ArcticDecoder():
 
         return new_components
 
-def temporal_batching(batch):
-    data_dict = {}
-    bs = len(batch)
-    ws = len(batch[0])
-
-    for i, window in enumerate(batch):
-        for j, sample in enumerate(window):
-            for path, data in sample:
-                comp = get_component_name(path)
-                if comp not in data_dict.keys():
-                    if isinstance(data, torch.Tensor) and data.isnan().any(): print(path)
-                    if isinstance(data, torch.Tensor) and comp != 'rgb':
-                        data_dict[comp] = torch.zeros((bs, ws, *data.shape), dtype=data.dtype)
-                    elif isinstance(data, np.ndarray):
-                        data_dict[comp] = np.zeros((bs, ws, *data.shape), dtype=data.dtype)
-                    else:
-                        data_dict[comp] = [[[None]] * ws] * bs
-
-                data_dict[comp][i][j] = data
-    
-    data_dict['rgb'] = [torch.stack(image_batch, dim=0) for image_batch in data_dict['rgb']]
-
-    return data_dict
-
-def resize_sample(path, sample):
-    resized_img = resize(sample, 500, antialias=True)
-    return resized_img
-
 def filter_fn(sample):
     valids = [data for s in sample for path, data in s if 'valid' in path]
     return all(valids)
 
-def decode_dataset(pipe: IterDataPipe, root, objects_root, device, arctic_decoder=None):
+def decode_dataset(pipe: IterDataPipe):
     """ Decodes the components of the dataset "dataset". """
     # TODO map components to decoding functions
     decoder_map = {"rgb": ImageDecoder('torch', decode_truncated_images=True)}
     # apply the decoding functions to each sample
     pipe = pipe.map(fn=Dispatcher(decoder_map))
-    pipe = pipe.map(fn=Dispatcher({"rgb": resize_sample}, 'decoded', 'resized'))
     pipe = pipe.map(fn=remove_wrapper)
     pipe = pipe.filter(filter_fn=filter_fn)
-    # pipe = pipe.map(fn=resize_sample)
-    # arctic_decoder = ArcticDecoder(root, objects_root, device) if arctic_decoder is None else arctic_decoder
-    # pipe = pipe.map(fn=arctic_decoder)
+
     return pipe
 
 def create_pipe(in_dir, objects_root, subset, mode, device, sliding_window_size, num_seqs, factory=None, arctic_decoder=None):
@@ -106,10 +75,10 @@ def create_pipe(in_dir, objects_root, subset, mode, device, sliding_window_size,
     shuffle_buffer_size = num_seqs # This is now the number of sequences in the buffer
 
     # Using the metadata created in the conversion process, the streaming pipeline can be created automatically.
-    arctic_decoder = ArcticDecoder(in_dir, objects_root, device, mode) if arctic_decoder is None else arctic_decoder
+    arctic_decoder = ArcticDecoder(objects_root, device, mode) if arctic_decoder is None else arctic_decoder
     pipe = factory.create_datapipe(subset, shuffle_buffer_size, shuffle_shards=True, temporal_sliding_window_size=sliding_window_size, add_component_fn=arctic_decoder if subset in ['train', 'val'] else None)
     # Decode the components of the dataset. Placing it in a function makes it reusable.
-    pipe = decode_dataset(pipe, in_dir, objects_root, device, arctic_decoder)
+    pipe = decode_dataset(pipe)
     # pipe = factory.add_temporal_windowing_and_shuffling(pipe)
     # pipe = pipe.map(fn=arctic_decoder)
 

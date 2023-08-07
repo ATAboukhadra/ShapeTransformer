@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from render_utils import create_renderer, render_arctic_mesh
 from vis_utils import showHandJoints
-from dataset.arctic_pipeline import create_pipe, temporal_batching
+from dataset.arctic_pipeline import create_pipe
 from tqdm import tqdm
 from models.Stohrmer import Stohrmer
 import os
@@ -11,6 +11,7 @@ from utils import AverageMeter, parse_args, create_logger, calculate_loss, calcu
 from tqdm import tqdm
 from models.model_poseformer import PoseTransformer
 from multigpu_helpers.dist_helper import DistributedHelper
+from datapipes.utils.collation_functions import collate_sequences_as_dicts
 
 def main():
 
@@ -25,10 +26,10 @@ def main():
     logger = create_logger(args.output_folder)
 
     train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', args.mode, 'cpu', args.window_size, args.num_seqs)
-    trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=temporal_batching, drop_last=True)
+    trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_sequences_as_dicts, drop_last=True)
 
     val_pipeline, val_count, _, _ = create_pipe(args.data_root, args.meta_root, 'val', args.mode, 'cpu', args.window_size, args.num_seqs, factory=factory, arctic_decoder=decoder)
-    valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=temporal_batching, drop_last=True)
+    valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_sequences_as_dicts, drop_last=True)
 
     dataset = decoder.dataset
     hand_faces = dataset.hand_faces
@@ -64,7 +65,7 @@ def main():
         errors = {k: AverageMeter() for k in keys}
         total_count = train_count // (args.batch_size * dh.world_size)
         loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
-        for i, data_dict in loader:
+        for i, (_, data_dict) in loader:
             if data_dict is None: continue
 
             data_dict['rgb'] = [img_batch.to(dh.local_rank) for img_batch in data_dict['rgb']]

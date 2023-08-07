@@ -393,7 +393,7 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     if master_condition: logger.info(f'Running validation for epoch {e}')
     iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
     
-    for i, data_dict in iterable_loader:
+    for i, (_, data_dict) in iterable_loader:
         if data_dict is None: continue
 
         data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
