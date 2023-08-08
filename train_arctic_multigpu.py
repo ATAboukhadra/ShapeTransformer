@@ -65,6 +65,11 @@ def main():
 
     keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
     store = dist.TCPStore('127.0.0.1', 1234, dh.world_size, dh.is_master)
+    
+    loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)    
+    c = 0
+    for _ in loader: c += 1
+    print(c, flush=True)
 
     for e in range(start_epoch, args.epochs):
 
