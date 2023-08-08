@@ -384,7 +384,6 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
 
 def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger, e, device, dh=None):
 
-    stop = Value('i', 0)
     keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
     errors = {k: AverageMeter() for k in keys}
     
@@ -395,6 +394,7 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
     
     for i, (_, data_dict) in iterable_loader:
+        if i / total_samples > 0.95: break
         if data_dict is None: continue
 
         data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
@@ -414,10 +414,6 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
 
         if (i+1) % 1000 == 0 and master_condition:
             logger.info(f'\nValidation: [{i+1}/{total_samples}]')
-
-        if stop.value: break
-
-    stop.value = 1
 
     return errors
 
