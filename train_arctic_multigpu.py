@@ -113,6 +113,7 @@ def main():
             if dh.is_master: break
 
         store.set('terminate', 'True')
+        print(store.get('terminate'), flush=True)
         dist.barrier()
 
         if dh.is_master:
