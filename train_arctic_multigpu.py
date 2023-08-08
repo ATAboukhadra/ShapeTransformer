@@ -13,6 +13,7 @@ from models.model_poseformer import PoseTransformer
 from multigpu_helpers.dist_helper import DistributedHelper
 from datapipes.utils.collation_functions import collate_sequences_as_dicts
 from multiprocessing import Value
+from torch import distributed as dist
 
 def main():
 
@@ -25,6 +26,7 @@ def main():
 
     if not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
     logger = create_logger(args.output_folder)
+
 
     train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', args.mode, 'cpu', args.window_size, args.num_seqs)
     trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_sequences_as_dicts, drop_last=True)
@@ -66,7 +68,8 @@ def main():
         errors = {k: AverageMeter() for k in keys}
         total_count = train_count // (args.batch_size * dh.world_size)
         loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
-        stop = Value('i', 0)
+        # stop = Value('i', 0)
+        stop = torch.tensor(0).to(dh.local_rank)
 
         for i, (_, data_dict) in loader:
             if data_dict is None: continue
@@ -97,24 +100,25 @@ def main():
                 errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
             
-            if stop.value == 1: 
+            if stop.item() > 0: 
                 logger.info(f'Stopping task {dh.local_rank} training')
                 break
-
+                
             if dh.is_master: break
 
+        stop.fill_(1)
         logger.info(f'Task {dh.local_rank} finished epoch {e}')
-        stop.value = 1
+        dist.all_reduce(stop, op=dist.ReduceOp.SUM, async_op=True)
 
         if dh.is_master:
             logger.info(f'Saving model at epoch {e}')
             torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
-        # errors = run_val(valloader, val_count, args.batch_size, dataset, target_idx, model, logger, e, dh.local_rank, dh)
-        # if dh.is_master:
-        #     error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
-        #     logger.info(f'\nEpoch {e} Val Err: {error_list}')
-        #     errors = {k: AverageMeter() for k in keys}
+        errors = run_val(valloader, val_count, args.batch_size, dataset, target_idx, model, logger, e, dh.local_rank, dh)
+        if dh.is_master:
+            error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
+            logger.info(f'\nEpoch {e} Val Err: {error_list}')
+            errors = {k: AverageMeter() for k in keys}
 
 
 if __name__ == '__main__':

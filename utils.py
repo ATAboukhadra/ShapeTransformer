@@ -116,7 +116,7 @@ def init_nimble(device):
     return nlayer
 
 
-def create_logger(dir):
+def create_logger(dir, name='mylog'):
 
     # Create a logger object
     logger = logging.getLogger(__name__)
@@ -127,7 +127,7 @@ def create_logger(dir):
     ch.setLevel(logging.DEBUG)
 
     # Create file handler
-    fh = logging.FileHandler(f'{dir}/mylog.log')
+    fh = logging.FileHandler(f'{dir}/{name}.log')
     fh.setLevel(logging.DEBUG)
 
     # Create formatter
