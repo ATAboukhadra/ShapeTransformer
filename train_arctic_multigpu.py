@@ -64,7 +64,7 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
-    store = dist.TCPStore('127.0.0.1', 1234, dh.world_size + 1, dh.is_master)
+    store = dist.TCPStore('127.0.0.1', 1234, dh.world_size, dh.is_master)
 
     for e in range(start_epoch, args.epochs):
 
