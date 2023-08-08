@@ -64,24 +64,17 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
-    # store = dist.TCPStore('127.0.0.1', 1234, dh.world_size, dh.is_master)
-    
+
     total_count = train_count // (args.batch_size * dh.world_size)
-    # loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)    
-    # c = 0
-    # for _ in loader: c += 1
-    # print(c, flush=True)
 
     for e in range(start_epoch, args.epochs):
 
         errors = {k: AverageMeter() for k in keys}
         loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
-        # termination_signal = torch.tensor(0, dtype=torch.int32).to(dh.local_rank)
-        # store.set('terminate', 'False')
+
         for i, (_, data_dict) in loader:
             
-            if i / total_count > 0.95: break
-            # dist.irecv(termination_signal)
+            if i / total_count > 0.9: break
 
             if data_dict is None: continue
             data_dict['rgb'] = [img_batch.to(dh.local_rank) for img_batch in data_dict['rgb']]
@@ -116,7 +109,7 @@ def main():
                 errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
-            if dh.is_master: break
+            # if dh.is_master: break
 
         # store.set('terminate', 'True')
         # print(store.get('terminate'), flush=True)

@@ -394,7 +394,7 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
     
     for i, (_, data_dict) in iterable_loader:
-        if i / total_samples > 0.95: break
+        if i / total_samples > 0.9: break
         if data_dict is None: continue
 
         data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
