@@ -99,7 +99,8 @@ def main():
                 logger.info(f'\nEpoch {e} [{i+1} / {total_count}]: {error_list}')
                 errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
-            
+
+            dist.all_reduce(stop, op=dist.ReduceOp.SUM, async_op=True)
             if stop.item() > 0: 
                 logger.info(f'Stopping task {dh.local_rank} training')
                 break
