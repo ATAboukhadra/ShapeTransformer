@@ -394,7 +394,8 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
     
     for i, (_, data_dict) in iterable_loader:
-        if i / total_samples > 0.9: break
+        if i / total_samples > 0.8: break # Due to unbalanced dataloaders between GPUs
+
         if data_dict is None: continue
 
         data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
@@ -413,7 +414,8 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
             errors[k].update(metrics[k].item(), batch_size)
 
         if (i+1) % 1000 == 0 and master_condition:
-            logger.info(f'\nValidation: [{i+1}/{total_samples}]')
+            error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
+            logger.info(f'\nValidation [{i+1}/{total_samples}] Err: {error_list}')
 
     return errors
 

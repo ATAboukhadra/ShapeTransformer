@@ -27,8 +27,6 @@ def main():
 
     if not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
     logger = create_logger(args.output_folder)
-    termination_file = os.path.join(args.output_folder, 'terminate.txt')
-
 
     train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', args.mode, 'cpu', args.window_size, args.num_seqs)
     trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_sequences_as_dicts, drop_last=True)
@@ -74,7 +72,7 @@ def main():
 
         for i, (_, data_dict) in loader:
             
-            if i / total_count > 0.9: break
+            if i / total_count > 0.8: break
 
             if data_dict is None: continue
             data_dict['rgb'] = [img_batch.to(dh.local_rank) for img_batch in data_dict['rgb']]
@@ -91,12 +89,6 @@ def main():
 
             with torch.no_grad():
                 metrics = calculate_error(outputs, data_dict, dataset, target_idx, model.module)
-            
-            # termination_flag = store.get('terminate')
-            # print(dh.local_rank, termination_flag, flush=True)
-            # if termination_flag == 'True':
-            #     logger.info(f'Stopping task {dh.local_rank} training')
-            #     break
 
             dh.sync_distributed_values(metrics)
             if dh.is_master:
@@ -108,12 +100,6 @@ def main():
                 logger.info(f'\nEpoch {e} [{i+1} / {total_count}]: {error_list}')
                 errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
-
-            # if dh.is_master: break
-
-        # store.set('terminate', 'True')
-        # print(store.get('terminate'), flush=True)
-        # dist.barrier()
 
         if dh.is_master:
             logger.info(f'Saving model at epoch {e}')
