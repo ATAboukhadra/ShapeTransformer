@@ -99,7 +99,7 @@ def main():
                 logger.info(f'Stopping task {dh.local_rank} training')
                 break
 
-            # dh.sync_distributed_values(metrics)
+            dh.sync_distributed_values(metrics)
             if dh.is_master:
                 for k in metrics.keys():
                     errors[k].update(metrics[k].item(), args.batch_size)
@@ -114,7 +114,7 @@ def main():
 
         store.set('terminate', 'True')
         print(store.get('terminate'), flush=True)
-        dist.barrier()
+        # dist.barrier()
 
         if dh.is_master:
             logger.info(f'Saving model at epoch {e}')
