@@ -73,6 +73,7 @@ def main():
         termination_signal = torch.tensor(0, dtype=torch.int32).to(dh.local_rank)
         for i, (_, data_dict) in loader:
             
+            dist.all_reduce(termination_signal, async_op=True)
             print(dh.local_rank, termination_signal.item(), flush=True)
             if termination_signal.item() == 1:
                 logger.info(f'Stopping task {dh.local_rank} training')
