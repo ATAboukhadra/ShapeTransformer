@@ -64,18 +64,21 @@ def main():
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
+    store = dist.TCPStore('127.0.0.1', 1234, dh.world_size + 1, dh.is_master)
 
     for e in range(start_epoch, args.epochs):
 
         errors = {k: AverageMeter() for k in keys}
         total_count = train_count // (args.batch_size * dh.world_size)
         loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
-        termination_signal = torch.tensor(0, dtype=torch.int32).to(dh.local_rank)
+        # termination_signal = torch.tensor(0, dtype=torch.int32).to(dh.local_rank)
+        store.set('terminate', False)
         for i, (_, data_dict) in loader:
             
-            dist.irecv(termination_signal)
-            print(dh.local_rank, termination_signal.item(), flush=True)
-            if termination_signal.item() == 1:
+            # dist.irecv(termination_signal)
+            termination_flag = store.get('terminate')
+            print(dh.local_rank, termination_flag, flush=True)
+            if termination_flag:
                 logger.info(f'Stopping task {dh.local_rank} training')
                 break
 
@@ -109,8 +112,7 @@ def main():
                 
             if dh.is_master: break
 
-        termination_signal.fill_(1)
-        dist.broadcast(termination_signal, src=dh.local_rank, async_op=True)
+        store.set('terminate', True)
         dist.barrier()
 
         if dh.is_master:
