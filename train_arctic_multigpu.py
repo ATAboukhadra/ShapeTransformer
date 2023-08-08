@@ -14,6 +14,7 @@ from multigpu_helpers.dist_helper import DistributedHelper
 from datapipes.utils.collation_functions import collate_sequences_as_dicts
 from multiprocessing import Value
 from torch import distributed as dist
+import os
 
 def main():
 
@@ -26,6 +27,7 @@ def main():
 
     if not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
     logger = create_logger(args.output_folder)
+    termination_file = os.path.join(args.output_folder, 'terminate.txt')
 
 
     train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', args.mode, 'cpu', args.window_size, args.num_seqs)
@@ -68,12 +70,15 @@ def main():
         errors = {k: AverageMeter() for k in keys}
         total_count = train_count // (args.batch_size * dh.world_size)
         loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
-        # stop = Value('i', 0)
-        stop = torch.tensor(0).to(dh.local_rank)
-
+        termination_signal = torch.tensor(0, dtype=torch.int32).to(dh.local_rank)
         for i, (_, data_dict) in loader:
-            if data_dict is None: continue
+            
+            print(dh.local_rank, termination_signal.item())
+            if termination_signal.item() == 1:
+                logger.info(f'Stopping task {dh.local_rank} training')
+                break
 
+            if data_dict is None: continue
             data_dict['rgb'] = [img_batch.to(dh.local_rank) for img_batch in data_dict['rgb']]
 
             for k in data_dict.keys():
@@ -100,16 +105,12 @@ def main():
                 errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
-            dist.all_reduce(stop, op=dist.ReduceOp.SUM, async_op=True)
-            if stop.item() > 0: 
-                logger.info(f'Stopping task {dh.local_rank} training')
-                break
                 
             if dh.is_master: break
 
-        stop.fill_(1)
-        logger.info(f'Task {dh.local_rank} finished epoch {e}')
-        dist.all_reduce(stop, op=dist.ReduceOp.SUM, async_op=True)
+        termination_signal.fill_(1)
+        dist.all_reduce(termination_signal, async_op=True)
+        dist.barrier()
 
         if dh.is_master:
             logger.info(f'Saving model at epoch {e}')
