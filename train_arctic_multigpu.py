@@ -66,6 +66,7 @@ def main():
     keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
     store = dist.TCPStore('127.0.0.1', 1234, dh.world_size, dh.is_master)
     
+    total_count = train_count // (args.batch_size * dh.world_size)
     loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)    
     c = 0
     for _ in loader: c += 1
@@ -74,7 +75,6 @@ def main():
     for e in range(start_epoch, args.epochs):
 
         errors = {k: AverageMeter() for k in keys}
-        total_count = train_count // (args.batch_size * dh.world_size)
         loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
         # termination_signal = torch.tensor(0, dtype=torch.int32).to(dh.local_rank)
         store.set('terminate', 'False')
