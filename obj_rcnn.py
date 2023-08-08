@@ -12,7 +12,7 @@ objects_root = 'dataset/arctic_objects'
 output_folder = '/checkpoints/arctic_obj_rcnn/'
 if not os.path.exists(output_folder): os.mkdir(output_folder)
 
-batch_size = 4
+batch_size = 16
 num_workers = 4
 sliding_window_size = 1
 epochs = 5
@@ -57,7 +57,7 @@ for e in range(epochs):
 
     losses_counters = {'loss_classifier': AverageMeter(), 'loss_box_reg': AverageMeter(), 'loss_keypoint': AverageMeter(), 'loss_objectness': AverageMeter(), 'loss_rpn_box_reg': AverageMeter()}
     with torch.no_grad():
-        for i, data in tqdm(enumerate(valloader), total=val_count // batch_size):
+        for i, (_, data) in tqdm(enumerate(valloader), total=val_count // batch_size):
             images = [sample[0].to(device) for sample in data['rgb']]
             keys = ['boxes', 'labels', 'keypoints']
             targets = [{k: data[k][i][0].to(device) for k in keys} for i in range(len(images))]
