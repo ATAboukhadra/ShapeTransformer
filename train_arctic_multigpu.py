@@ -76,11 +76,6 @@ def main():
         for i, (_, data_dict) in loader:
             
             # dist.irecv(termination_signal)
-            termination_flag = store.get('terminate')
-            print(dh.local_rank, termination_flag, flush=True)
-            if termination_flag == 'True':
-                logger.info(f'Stopping task {dh.local_rank} training')
-                break
 
             if data_dict is None: continue
             data_dict['rgb'] = [img_batch.to(dh.local_rank) for img_batch in data_dict['rgb']]
@@ -98,6 +93,12 @@ def main():
             with torch.no_grad():
                 metrics = calculate_error(outputs, data_dict, dataset, target_idx, model.module)
             
+            termination_flag = store.get('terminate')
+            print(dh.local_rank, termination_flag, flush=True)
+            if termination_flag == 'True':
+                logger.info(f'Stopping task {dh.local_rank} training')
+                break
+
             dh.sync_distributed_values(metrics)
             if dh.is_master:
                 for k in metrics.keys():
@@ -109,7 +110,6 @@ def main():
                 errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
-                
             if dh.is_master: break
 
         store.set('terminate', 'True')
