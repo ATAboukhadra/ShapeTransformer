@@ -99,7 +99,7 @@ def main():
                 logger.info(f'Stopping task {dh.local_rank} training')
                 break
 
-            dh.sync_distributed_values(metrics)
+            # dh.sync_distributed_values(metrics)
             if dh.is_master:
                 for k in metrics.keys():
                     errors[k].update(metrics[k].item(), args.batch_size)
