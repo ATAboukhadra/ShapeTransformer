@@ -7,6 +7,7 @@ from models.graformer import GraFormer
 from manopth.manolayer import ManoLayer
 from dataset.arctic_utils import transform_points_batch
 from models.poseformer import Transformer
+import torchvision
 
 class Stohrmer(nn.Module):
     def __init__(self, device, num_kps=21, num_frames=9, spatial_dim=32, temporal_dim=128, extra_features=32):
@@ -17,6 +18,10 @@ class Stohrmer(nn.Module):
         mano_layer_right = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=False, use_pca=False).to(device)
         mano_layer_left = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=False, use_pca=False, side='left').to(device)
         self.mano_layers = {'right': mano_layer_right, 'left': mano_layer_left}
+
+        self.obj_rcnn = torchvision.models.detection.keypointrcnn_resnet50_fpn(num_keypoints=30, num_classes=22)
+        self.obj_rcnn.load_state_dict(torch.load('checkpoints/keypointrcnn_resnet50_fpn_2.pt'))
+        self.obj_rcnn.eval()
 
         self.spatial_encoder = GraFormer(num_pts=num_kps, coords_dim=(2, spatial_dim))
         num_features = spatial_dim * num_kps + 512
@@ -41,12 +46,43 @@ class Stohrmer(nn.Module):
         kps_cam = transform_points_batch(cam_ext, kps_world)
         return verts_cam, kps_cam
     
+    def get_top_bottom_class(self, obj_outputs, bs, t):
+        
+        obj_keypoints = torch.zeros((bs * t, 2, 30))
+        obj_class = torch.zeros((bs * t, 1))
+        for i, output in enumerate(obj_outputs):
+            keypoints1 = output['keypoints'][0]
+            label1 = output['labels'][0]
+            idx2 = torch.where(abs(output[0]['labels']-label1) == 1)[0]
+
+            if len(idx2) == 0:
+                keypoints2 = keypoints1
+            else:
+                keypoints2 = output['keypoints'][idx2[0]]
+            
+            if label1 % 2 == 0:
+                keypoints_top = keypoints1
+                keypoints_bottom = keypoints2
+            else:
+                keypoints_top = keypoints2
+                keypoints_bottom = keypoints1
+            
+            obj_keypoints[i][0] = keypoints_top
+            obj_keypoints[i][1] = keypoints_bottom
+            obj_class[i] = label1 // 2
+
+
     def forward(self, batch_dict):
         # 2D Pose Spatial Features
         pose2d = batch_dict['hands_pose2d'].to(self.device)
         bs, t, n, k, d = pose2d.shape
         pose2d = pose2d.view(bs * t, n * k, d)
         spatial_pose_features = self.spatial_encoder(pose2d).view(bs, t, -1)
+        
+        # Object Pose
+        img_list = [batch_dict['rgb'][i][j] for i in range(bs) for j in range(t)]
+        obj_outputs = self.obj_rcnn(img_list)
+        obj_pose = self.get_top_bottom_class(obj_outputs)
 
         # Image Features
         img_list = batch_dict['rgb']

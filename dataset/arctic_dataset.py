@@ -20,7 +20,7 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 class ArcticDataset(Dataset):
-    def __init__(self, objects_root, device, mode, iterable=False):
+    def __init__(self, objects_root, device, mode, iterable=False, num_kps_obj=21):
         self.root = 'dataset/meta/'
         self.mode = mode
         mano_layer_right = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=False, use_pca=False).to(device)
@@ -42,7 +42,7 @@ class ArcticDataset(Dataset):
         self.device = device
         self.objects = {name: {} for name in os.listdir(objects_root)}
         self.object_keypoints = {name: {} for name in os.listdir(objects_root)}
-        self.num_kps_obj = 30
+        self.num_kps_obj = num_kps_obj
         self.resize_factor = 4
         self.load_objects()
         self.object_names = sorted(list(self.objects.keys()))
@@ -186,9 +186,16 @@ class ArcticDataset(Dataset):
             hand_dict[f'{side}_pose3d'] = kps[0]
 
         hand_dict['hands_pose2d'] = pose2d
+        left_bb = self.calculate_bounding_box(pose2d[0])
+        right_bb = self.calculate_bounding_box(pose2d[1])
+        bbs = torch.stack((left_bb, right_bb), dim=0)
+        visibility = torch.ones((2, 21, 1), dtype=torch.float32)
+        keypoints = torch.cat((pose2d, visibility), dim=2)
+        labels = self.create_obj_labels('hand')
+
         # print(f'load_hand_annotations: {time.time()-t1}')
 
-        return hand_dict, valid
+        return hand_dict, bbs, keypoints, labels, valid
 
     def load_obj_annotations(self, subject, seq_name, frame_num, cam_ext, cam_int, obj, valid):
         # obj_annotations_path = os.path.join(self.root, 'raw_seqs', subject, seq_name+f'.object.npy')
@@ -214,17 +221,17 @@ class ArcticDataset(Dataset):
         bottom_bb = self.calculate_bounding_box(obj_kps2d[1])
         bbs = torch.stack((top_bb, bottom_bb), dim=0)
         visibility = torch.ones((2, self.num_kps_obj, 1), dtype=torch.float32)
-        # obj_dict['keypoints'] = 
-        obj_dict['keypoints'] = torch.cat((obj_kps2d[:, :self.num_kps_obj], visibility), dim=2)
-        obj_dict['boxes'] = bbs
-        obj_dict['labels'] = self.create_obj_labels(obj)
-        # print(obj_kps.shape)
-        return obj_dict, valid
+        keypoints = torch.cat((obj_kps2d[:, :self.num_kps_obj], visibility), dim=2)
+        labels = self.create_obj_labels(obj)
+        return obj_dict, bbs, keypoints, labels, valid
 
     def create_obj_labels(self, obj_name):
-        obj_label_top = self.object_names.index(obj_name) * 2 
-        obj_label_bottom = obj_label_top + 1
-        obj_labels = torch.tensor([obj_label_top, obj_label_bottom], dtype=torch.long)
+        if obj_name == 'hand':
+            return torch.tensor([22, 23], dtype=torch.long)
+        else:
+            obj_label_top = self.object_names.index(obj_name) * 2 
+            obj_label_bottom = obj_label_top + 1
+            obj_labels = torch.tensor([obj_label_top, obj_label_bottom], dtype=torch.long)
         return obj_labels
 
     def transform_points(self, points, cam_ext, part, quat_arti, quat_global, trans):
@@ -293,11 +300,17 @@ class ArcticDataset(Dataset):
         # _, pose2d, _, _, _ = detect_hand(img, detector=self.hand_detector)
         # pose2d = torch.zeros((2, 21, 2))
         cam_ext, cam_int, valid = self.load_camera_matrix(subject, seq_name, camera_num, frame_num, valid)
-        hand_dict, valid = self.load_hand_annotations(subject, seq_name, frame_num, cam_ext, cam_int, valid)
-        obj_dict, valid = self.load_obj_annotations(subject, seq_name, frame_num, cam_ext, cam_int, obj, valid)
+        hand_dict, hand_bbs, hand_keypoints, hand_labels, valid = self.load_hand_annotations(subject, seq_name, frame_num, cam_ext, cam_int, valid)
+        obj_dict, obj_bbs, obj_keypoints, obj_labels, valid = self.load_obj_annotations(subject, seq_name, frame_num, cam_ext, cam_int, obj, valid)
 
+        
         hand_dict.update(obj_dict)
         data_dict = hand_dict
+        
+        data_dict['boxes'] = torch.cat([obj_bbs, hand_bbs], dim=0)
+        data_dict['keypoints'] = torch.cat([obj_keypoints, hand_keypoints], dim=0)
+        data_dict['labels'] = torch.cat([obj_labels, hand_labels], dim=0)
+
         data_dict['valid'] = valid
         data_dict['key'] = key
         # data_dict['hands_pose2d'] = pose2d.to(self.device)

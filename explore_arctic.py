@@ -3,7 +3,7 @@ import torch
 import numpy as np
 from render_utils import create_renderer, render_arctic_mesh
 from vis_utils import showHandJoints, draw_bb
-from dataset.arctic_pipeline import create_pipe, temporal_batching
+from dataset.arctic_pipeline import create_pipe
 from tqdm import tqdm
 from torchvision.transforms.functional import resize
 from utils import project_3D_points
@@ -24,10 +24,10 @@ num_seqs = 16
 mode = 'all'
 
 train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', mode, 'cpu', sliding_window_size, num_seqs)
-trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=0, collate_fn=collate_sequences_as_dicts)
+trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=num_workers, collate_fn=collate_sequences_as_dicts)
 
 val_pipeline, _, _, _ = create_pipe(root, objects_root, 'val', mode, 'cpu', sliding_window_size, num_seqs, factory=factory, arctic_decoder=decoder)
-valloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=0, collate_fn=collate_sequences_as_dicts)
+valloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=num_workers, collate_fn=collate_sequences_as_dicts)
 
 # dataset = ArcticDataset(root, objects_root, device=device)
 dataset = decoder.dataset
@@ -56,7 +56,7 @@ for idx, (_, data_dict) in tqdm(enumerate(trainloader), total=num_samples // bat
     cam_ext = data_dict['cam_ext'][0]
     obj_verts, obj_kps = dataset.transform_obj(object_name, articulation, rot, trans, cam_ext)
 
-    obj_kps2d = data_dict['keypoints'][0].view(sliding_window_size, 2, -1, 3).cpu().numpy()
+    obj_kps2d = data_dict['keypoints'][0].view(sliding_window_size, 4, -1, 3).cpu().numpy()
     
     for i in tqdm(range(data_dict['rgb'][0].shape[0])):
         img = data_dict['rgb'][0][i].cpu().numpy().transpose(1, 2, 0)
@@ -64,16 +64,21 @@ for idx, (_, data_dict) in tqdm(enumerate(trainloader), total=num_samples // bat
         # if i == 0:
         #     plt.imshow(img)
         #     plt.show()
-        if data_dict['hands_pose2d'][0][i].shape[0] > 0:
-            for hand in data_dict['hands_pose2d'][0][i]:
-                img = showHandJoints(img, hand.cpu().numpy())
+        # if data_dict['hands_pose2d'][0][i].shape[0] > 0:
+        #     for hand in data_dict['hands_pose2d'][0][i]:
+        #         img = showHandJoints(img, hand.cpu().numpy())
         plt.subplot(*fig_dim, i+1)
         boxes = data_dict['boxes'][0, i].cpu().numpy()
-        img = draw_bb(img, boxes[0], (255, 0, 0))
-        img = draw_bb(img, boxes[1], (0, 255, 0))
+        img = draw_bb(img, boxes[0], (255, 218, 185))
+        img = draw_bb(img, boxes[1], (173, 216, 230))
+        img = draw_bb(img, boxes[2], (144, 238, 144))
+        img = draw_bb(img, boxes[3], (255, 215, 0))
+
         plt.imshow(img)
         plt.scatter(obj_kps2d[i, 0, :, 0], obj_kps2d[i, 0, :, 1], c='peachpuff', s=1)
         plt.scatter(obj_kps2d[i, 1, :, 0], obj_kps2d[i, 1, :, 1], c='lightblue', s=1)
+        plt.scatter(obj_kps2d[i, 2, :, 0], obj_kps2d[i, 2, :, 1], c='lightgreen', s=1)
+        plt.scatter(obj_kps2d[i, 3, :, 0], obj_kps2d[i, 3, :, 1], c='gold', s=1)
 
         verts_list, faces_list, textures_list = [], [], []
     
