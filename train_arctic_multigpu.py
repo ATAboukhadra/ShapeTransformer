@@ -24,6 +24,7 @@ class Terminate():
             f.write('')
 
     def isTerminated(self):
+        
         return os.path.exists(self.terminate_log_path)
 
 def main():
@@ -112,7 +113,10 @@ def main():
                 errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
-        if dh.is_master: t.terminate()
+            if dh.is_master: break
+
+        print('terminate on gpu', dh.local_rank, flush=True)
+        t.terminate()
 
         if dh.is_master:
             logger.info(f'Saving model at epoch {e}')
