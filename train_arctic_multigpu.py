@@ -12,9 +12,19 @@ from tqdm import tqdm
 from models.model_poseformer import PoseTransformer
 from multigpu_helpers.dist_helper import DistributedHelper
 from datapipes.utils.collation_functions import collate_sequences_as_dicts
-from multiprocessing import Value
 from torch import distributed as dist
 import os
+
+class Terminate():
+    def __init__(self, terminate_log_path):
+        self.terminate_log_path = terminate_log_path
+
+    def terminate(self):
+        with open(self.terminate_log_path, 'w') as f:
+            f.write('')
+
+    def isTerminated(self):
+        return os.path.exists(self.terminate_log_path)
 
 def main():
 
@@ -66,10 +76,9 @@ def main():
 
         errors = {k: AverageMeter() for k in keys}
         loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
+        t = Terminate(f'{args.output_folder}/terminate_{e}.txt')
 
         for i, (_, data_dict) in loader:
-            
-            if i / total_count > 0.75: break
 
             if data_dict is None: continue
             data_dict['rgb'] = [img_batch.to(dh.local_rank) for img_batch in data_dict['rgb']]
@@ -80,6 +89,11 @@ def main():
 
             outputs = model(data_dict)
             loss = calculate_loss(outputs, data_dict)
+            
+            if i / total_count > 0.00: 
+                if t.isTerminated():
+                    break
+            
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -97,6 +111,8 @@ def main():
                 logger.info(f'\nEpoch {e} [{i+1} / {total_count}]: {error_list}')
                 errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
+
+        if dh.is_master: t.terminate()
 
         if dh.is_master:
             logger.info(f'Saving model at epoch {e}')
