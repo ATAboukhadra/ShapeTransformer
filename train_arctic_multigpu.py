@@ -77,7 +77,7 @@ def main():
 
         errors = {k: AverageMeter() for k in keys}
         loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
-        t = Terminate(f'{args.output_folder}/terminate_{e}.txt')
+        # t = Terminate(f'{args.output_folder}/terminate_{e}.txt')
 
         for i, (_, data_dict) in loader:
 
@@ -91,10 +91,10 @@ def main():
             outputs = model(data_dict)
             loss = calculate_loss(outputs, data_dict)
             
-            if i / total_count > 0.00: 
-                if t.isTerminated():
-                    print('gpu', dh.local_rank, flush=True)
-                    break
+            if i / total_count > 0.75: 
+                # if t.isTerminated():
+                #     print('gpu', dh.local_rank, flush=True)
+                break
             
             optimizer.zero_grad()
             loss.backward()
@@ -114,10 +114,10 @@ def main():
                 errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
-            if dh.is_master: break
+            # if dh.is_master: break
 
-        print('terminate on gpu', dh.local_rank, flush=True)
-        t.terminate()
+        # print('terminate on gpu', dh.local_rank, flush=True)
+        # t.terminate()
 
         if dh.is_master:
             logger.info(f'Saving model at epoch {e}')
