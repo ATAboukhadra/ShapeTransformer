@@ -93,6 +93,7 @@ def main():
             
             if i / total_count > 0.00: 
                 if t.isTerminated():
+                    print('gpu', dh.local_rank, flush=True)
                     break
             
             optimizer.zero_grad()
