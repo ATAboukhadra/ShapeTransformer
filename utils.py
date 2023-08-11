@@ -16,9 +16,6 @@ from manopth.manolayer import ManoLayer
 from tqdm import tqdm
 from pytorch3d.loss import chamfer_distance
 from multiprocessing import Value
-from models.model_poseformer import PoseTransformer
-from models.thor import THOR
-from models.Stohrmer import Stohrmer
 
 # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 # data_path = '/home2/HO3D_v3'
@@ -472,6 +469,9 @@ def get_keypoints(outputs, i):
 
 
 def load_model(args, device):
+    from models.model_poseformer import PoseTransformer
+    from models.thor import THOR
+    from models.Stohrmer import Stohrmer
     if args.model_name == 'stohrmer':
         model = Stohrmer(device, num_kps=42, num_frames=args.window_size).to(device)
     elif args.model_name == 'poseformer':
