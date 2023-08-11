@@ -37,7 +37,7 @@ class DistributedHelper:
     def wrap_model_for_ddp(self, model: torch.nn.Module):
         model = model.to(self.local_rank)
         if dist.is_initialized():
-            model = DistributedDataParallel(model, device_ids=[self.local_rank], output_device=self.local_rank)#, find_unused_parameters=True)
+            model = DistributedDataParallel(model, device_ids=[self.local_rank], output_device=self.local_rank, find_unused_parameters=True)
         return model
 
     def sync_distributed_values(self, values: dict[str, torch.Tensor]):
