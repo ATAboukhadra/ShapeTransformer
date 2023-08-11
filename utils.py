@@ -410,7 +410,7 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
     
     for i, (_, data_dict) in iterable_loader:
-        if i / total_samples > 0.7: break # Due to unbalanced dataloaders between GPUs
+        if i / total_samples > 0.75: break # Due to unbalanced dataloaders between GPUs
 
         if data_dict is None: continue
 
@@ -477,6 +477,6 @@ def load_model(args, device):
     elif args.model_name == 'poseformer':
         model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2).to(device)
     elif args.model_name == 'thor':
-        model = THOR(device, num_kps=84, rcnn_path=os.path.join(args.output_folder, 'rcnn.pth')).to(device)
+        model = THOR(device, num_frames=args.window_size, num_kps=84, rcnn_path=os.path.join(args.output_folder, 'rcnn.pth')).to(device)
     
     return model

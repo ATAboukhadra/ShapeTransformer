@@ -7,7 +7,7 @@ from dataset.arctic_pipeline import create_pipe
 from tqdm import tqdm
 from models.Stohrmer import Stohrmer
 import os
-from utils import AverageMeter, parse_args, create_logger, calculate_loss, calculate_error, run_val, load_model
+from utils import AverageMeter, parse_args, create_logger, calculate_loss, calculate_error, run_val, load_model, load_weights
 from tqdm import tqdm
 from models.model_poseformer import PoseTransformer
 from multigpu_helpers.dist_helper import DistributedHelper
@@ -69,7 +69,7 @@ def main():
 
         for i, (_, data_dict) in loader:
             
-            if i / total_count > 0.7: break
+            if i / total_count > 0.75: break
 
             if data_dict is None: continue
             data_dict['rgb'] = [img_batch.to(dh.local_rank) for img_batch in data_dict['rgb']]

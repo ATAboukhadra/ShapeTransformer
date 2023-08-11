@@ -24,17 +24,19 @@ class THOR(nn.Module):
         self.obj_rcnn.load_state_dict(torch.load(rcnn_path))
         self.obj_rcnn.eval()
 
-        self.spatial_encoder = GraFormer(num_pts=num_kps, coords_dim=(2, 3))
-        # num_features = spatial_dim * num_kps + 512
+        self.spatial_output = 3 if num_frames == 1 else spatial_dim
+        self.spatial_encoder = GraFormer(num_pts=num_kps, coords_dim=(2, self.spatial_output))
 
-        # # self.resize = transforms.Resize(500, antialias=True)
+        num_features = spatial_dim * num_kps
+        if num_frames > 1:
+            self.temporal_encoder = GraFormer(hid_dim=temporal_dim, coords_dim=(num_features, 3 * num_kps), num_pts=num_frames, temporal=True)
+
         # weights = ResNet18_Weights.DEFAULT
         # full_resnet18 = resnet18(weights=weights, progress=False)
         # self.resnet18 = torch.nn.Sequential(*list(full_resnet18.children())[:-1])
 
         # # 48 MANO Pose, 3 Translation, 7 Object Pose, additional per-frame features, 21 3D KPs
         # frame_output_dim = 3 * 2 + 45 * 2 + 3 * 2 + 7 + extra_features #+ 2 * 21 * 3
-        # self.temporal_encoder = GraFormer(hid_dim=temporal_dim, coords_dim=(num_features, frame_output_dim), num_pts=num_frames, temporal=True)
         
         # output_dim = 10 * 2 + 11 # 10 MANO Shape, 11 Object Classes
         # self.output = nn.Linear(extra_features * num_frames, output_dim)
@@ -66,7 +68,13 @@ class THOR(nn.Module):
                     graph[i][o] = kps[o][:, :2]
 
         graph = graph.view(bs * t, 4 * 21, 2)
-        pose3d = self.spatial_encoder(graph).view(bs, t, -1, 3)
+        spatial_out = self.spatial_encoder(graph).view(bs, t, -1, self.spatial_output)
 
+        if t > 1:
+            temporal_out = self.temporal_encoder(spatial_out.view(bs, t, -1)).view(bs, t, -1, 3)
+            pose3d = temporal_out
+        else:
+            pose3d = spatial_out
+            
         return pose3d
 
