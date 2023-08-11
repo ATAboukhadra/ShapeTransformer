@@ -37,16 +37,13 @@ def main():
     dataset = decoder.dataset
     hand_faces = dataset.hand_faces
 
-    if args.model_name == 'stohrmer':
-        model = Stohrmer(dh.local_rank, num_kps=42, num_frames=args.window_size)
-    else:
-        model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2)
+    model = load_model(args, dh.local_rank)
 
     start_epoch = 0
     if args.weights:
         if dh.is_master: 
             logger.info(f'Loading model from {args.weights} if exists')
-        model, start_epoch = load_model(model, args.weights)
+        model, start_epoch = load_weights(model, args.weights)
     
     model = dh.wrap_model_for_ddp(model)
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -72,7 +69,7 @@ def main():
 
         for i, (_, data_dict) in loader:
             
-            if i / total_count > 0.8: break
+            if i / total_count > 0.7: break
 
             if data_dict is None: continue
             data_dict['rgb'] = [img_batch.to(dh.local_rank) for img_batch in data_dict['rgb']]

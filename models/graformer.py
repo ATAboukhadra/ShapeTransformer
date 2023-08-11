@@ -39,6 +39,15 @@ def create_pose_edges(num_pts):
     elif num_pts == 42: # Two Hands
         edges.extend(hand_edges)
         edges.extend(list(np.array(hand_edges) + 21))
+    elif num_pts == 21 * 4: # Two Hands and Two Objects
+        edges.extend(hand_edges)
+        edges.extend(list(np.array(hand_edges) + 21))
+        obj_edges = []
+        for o in range(2):
+            for i in range(21):
+                for j in range(21):
+                    obj_edges.append([42 + i + o * 21, 42 + j + o * 21])
+        # print(obj_edges)
     return edges
 
 def create_temporal_edges(num_pts):

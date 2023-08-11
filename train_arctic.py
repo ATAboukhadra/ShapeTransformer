@@ -7,9 +7,9 @@ from dataset.arctic_pipeline import create_pipe
 from tqdm import tqdm
 from models.Stohrmer import Stohrmer
 import os
-from utils import AverageMeter, parse_args, create_logger, calculate_loss, calculate_error, run_val, load_model
+from utils import AverageMeter, parse_args, create_logger, calculate_loss, calculate_error, run_val, load_model, load_weights
 from tqdm import tqdm
-from models.model_poseformer import PoseTransformer
+
 from datapipes.utils.collation_functions import collate_sequences_as_dicts
 
 
@@ -32,15 +32,11 @@ valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=args.batch_size
 dataset = decoder.dataset
 hand_faces = dataset.hand_faces
 
-if args.model_name == 'stohrmer':
-    model = Stohrmer(device, num_kps=42, num_frames=args.window_size).to(device)
-else:
-    model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2).to(device)
-
+model = load_model(args, device)
 start_epoch = 0
 if args.weights:
     logger.info(f'Loading model from {args.weights}')
-    model, start_epoch = load_model(model, args.weights)
+    model, start_epoch = load_weights(model, args.weights)
 
 num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 logger.info(f'total number of parameters: {num_params}')

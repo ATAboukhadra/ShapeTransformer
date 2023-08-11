@@ -16,6 +16,10 @@ from manopth.manolayer import ManoLayer
 from tqdm import tqdm
 from pytorch3d.loss import chamfer_distance
 from multiprocessing import Value
+from models.model_poseformer import PoseTransformer
+from models.thor import THOR
+from models.Stohrmer import Stohrmer
+
 # device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 # data_path = '/home2/HO3D_v3'
 # cam_intr = torch.tensor([
@@ -278,12 +282,23 @@ CEL = torch.nn.CrossEntropyLoss()
 def calculate_pose_loss(outputs, targets, target_idx=0, mode='loss'):
     left_pose_gt = targets['left_pose3d'][:, target_idx]
     right_pose_gt = targets['right_pose3d'][:, target_idx]
-    # pose_gt = torch.cat([left_pose_gt, right_pose_gt], dim=2)
-    # pose_loss = L2(outputs, pose_gt)
-    left_pose_loss = mpjpe(outputs[:, 0, :21], left_pose_gt)
-    right_pose_loss = mpjpe(outputs[:, 0, 21:], right_pose_gt)
+
+    output_target_idx = target_idx if outputs.shape[1] > 1 else 0
+    left_pose_loss = mpjpe(outputs[:, output_target_idx, :21], left_pose_gt)
+    right_pose_loss = mpjpe(outputs[:, output_target_idx, 21:42], right_pose_gt)
     pose_loss = left_pose_loss + right_pose_loss
-    return pose_loss if mode == 'loss' else (left_pose_loss * 1000, right_pose_loss * 1000)
+
+    errors = [left_pose_loss * 1000, right_pose_loss * 1000]
+
+    if outputs.shape[2] > 42:
+        top_pose_gt = targets['top_kps3d'][:, target_idx]
+        bottom_pose_gt = targets['bottom_kps3d'][:, target_idx]
+        top_pose_loss = mpjpe(outputs[:, output_target_idx, 42:63], top_pose_gt)
+        bottom_pose_loss = mpjpe(outputs[:, output_target_idx, 63:], bottom_pose_gt)
+        pose_loss += top_pose_loss + bottom_pose_loss
+        errors += [top_pose_loss * 1000, bottom_pose_loss * 1000]
+
+    return pose_loss if mode == 'loss' else errors
 
 def calculate_loss(outputs, targets, target_idx=0):
     if not isinstance(outputs, dict):
@@ -316,10 +331,14 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
     metrics = {}
 
     if not isinstance(outputs, dict):
-        left_pose_err, right_pose_err = calculate_pose_loss(outputs, targets, target_idx, mode='error')
+        errors = calculate_pose_loss(outputs, targets, target_idx, mode='error')
 
-        metrics['left_pose_err'] = left_pose_err
-        metrics['right_pose_err'] = right_pose_err
+        metrics['left_pose_err'] = errors[0]
+        metrics['right_pose_err'] = errors[1]
+
+        if len(errors) > 2:
+            metrics['top_obj_err'] = errors[2]
+            metrics['bottom_obj_err'] = errors[3]
 
         return metrics
 
@@ -394,7 +413,7 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
     
     for i, (_, data_dict) in iterable_loader:
-        if i / total_samples > 0.8: break # Due to unbalanced dataloaders between GPUs
+        if i / total_samples > 0.7: break # Due to unbalanced dataloaders between GPUs
 
         if data_dict is None: continue
 
@@ -419,7 +438,7 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
 
     return errors
 
-def load_model(model, weights_path):
+def load_weights(model, weights_path):
     start_epoch = 0
     if os.path.isfile(weights_path):
         checkpoint = torch.load(weights_path)
@@ -427,3 +446,37 @@ def load_model(model, weights_path):
         start_epoch = int(weights_path.split('/')[-1].split('_')[-1].split('.')[0]) + 1
 
     return model, start_epoch
+
+def get_keypoints(outputs, i):
+    keypoints = outputs[i]['keypoints']
+    labels = outputs[i]['labels']
+    left_hand, right_hand, top_object, bottom_object = None, None, None, None
+    # Hands
+    left_hand_idx = torch.where(labels == 22)[0]
+    right_hand_idx = torch.where(labels == 23)[0]
+    if len(left_hand_idx) > 0:
+        left_hand = keypoints[left_hand_idx[0]]
+    if len(right_hand_idx) > 0:
+        right_hand = keypoints[right_hand_idx[0]]
+    
+    # Objects
+    top_object_idx = torch.where((labels < 22) & (labels % 2 == 0))[0]
+    bottom_object_idx = torch.where((labels < 22) & (labels % 2 == 1))[0]
+
+    if len(top_object_idx) > 0:
+        top_object = keypoints[top_object_idx[0]]
+    if len(bottom_object_idx) > 0:
+        bottom_object = keypoints[bottom_object_idx[0]]
+    
+    return left_hand, right_hand, top_object, bottom_object
+
+
+def load_model(args, device):
+    if args.model_name == 'stohrmer':
+        model = Stohrmer(device, num_kps=42, num_frames=args.window_size).to(device)
+    elif args.model_name == 'poseformer':
+        model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2).to(device)
+    elif args.model_name == 'thor':
+        model = THOR(device, num_kps=84, rcnn_path=os.path.join(args.output_folder, 'rcnn.pth')).to(device)
+    
+    return model

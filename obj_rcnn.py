@@ -12,7 +12,7 @@ objects_root = 'dataset/arctic_objects'
 output_folder = '/checkpoints/arctic_rcnn_allocentric/'
 if not os.path.exists(output_folder): os.mkdir(output_folder)
 
-batch_size = 16
+batch_size = 1
 num_workers = 4
 sliding_window_size = 1
 epochs = 5
@@ -49,7 +49,7 @@ for e in range(epochs):
             losses_counters[k].update(losses[k].item(), len(images))
 
         if (i+1) % 1000 == 0:
-            print(i+1, [(k, round(losses_counters[k].avg, 2)) for k in losses.keys()])
+            print(i+1, [(k, round(losses_counters[k].avg, 2)) for k in losses.keys()], flush=True)
             torch.save(model.state_dict(), f'{output_folder}keypointrcnn_resnet50_fpn_{e}.pth')
             for k in losses.keys():
                 losses_counters[k].reset()
