@@ -55,7 +55,8 @@ class THOR(nn.Module):
         images = batch_dict['rgb']
         # Expand list of temporal batches to list of list of frames
         images = [img for temporal_batch in images for img in temporal_batch]
-        rcnn_outputs = self.obj_rcnn(images)
+        with torch.no_grad():
+            rcnn_outputs = self.obj_rcnn(images)
 
         graph = torch.zeros(bs * t, 4, 21, 2).to(self.device)
         for i in range(bs * t):
