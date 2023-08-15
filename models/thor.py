@@ -11,7 +11,7 @@ import torchvision
 from utils import get_keypoints
 
 class THOR(nn.Module):
-    def __init__(self, device, num_kps=84, num_frames=9, spatial_dim=32, temporal_dim=128, extra_features=32, rcnn_path=''):
+    def __init__(self, device, num_kps=84, input_dim=2, num_frames=9, spatial_dim=32, temporal_dim=128, extra_features=32, rcnn_path=''):
         super().__init__()
         self.device = device
 
@@ -25,7 +25,8 @@ class THOR(nn.Module):
         self.obj_rcnn.eval()
 
         self.spatial_output = 3 if num_frames == 1 else spatial_dim
-        self.spatial_encoder = GraFormer(num_pts=num_kps, coords_dim=(2, self.spatial_output))
+        self.input_dim = input_dim
+        self.spatial_encoder = GraFormer(num_pts=num_kps, coords_dim=(self.input_dim, self.spatial_output))
 
         num_features = spatial_dim * num_kps
         if num_frames > 1:
@@ -51,6 +52,11 @@ class THOR(nn.Module):
         kps_cam = transform_points_batch(cam_ext, kps_world)
         return verts_cam, kps_cam
 
+    def one_hot(self, label):
+        one_hot = torch.zeros(24)#.to(self.device)
+        one_hot[label] = 1
+        one_hot = one_hot.unsqueeze(0).repeat(21, 1).to(self.device)
+        return one_hot
 
     def forward(self, batch_dict):
         bs, t = len(batch_dict['rgb']), batch_dict['rgb'][0].shape[0]
@@ -62,14 +68,15 @@ class THOR(nn.Module):
         with torch.no_grad():
             rcnn_outputs = self.obj_rcnn(images)
 
-        graph = torch.zeros(bs * t, 4, 21, 2).to(self.device)
+        graph = torch.zeros(bs * t, 4, 21, self.input_dim).to(self.device)
         for i in range(bs * t):
-            kps = get_keypoints(rcnn_outputs, i)
+            kps, labels = get_keypoints(rcnn_outputs, i)
             for o in range(4):
                 if kps[o] is not None:
-                    graph[i][o] = kps[o][:, :2]
+                    graph[i, o, :, :2] = kps[o][:, :2]
+                    if self.input_dim > 2: graph[i, o, :, 2:] = self.one_hot(labels[o]) 
 
-        graph = graph.view(bs * t, 4 * 21, 2)
+        graph = graph.view(bs * t, 4 * 21, self.input_dim)
         spatial_out = self.spatial_encoder(graph).view(bs, t, -1, self.spatial_output)
 
         if t > 1:

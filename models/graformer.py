@@ -378,7 +378,7 @@ class GraFormer(nn.Module):
         out = self.gconv_input(x, self.adj)
         if self.temporal:
             out = out + self.temporal_pos_embed
-            
+
         for i in range(self.n_layers):
             out = self.atten_layers[i](out, self.mask)
             out = self.gconv_layers[i](out)

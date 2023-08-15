@@ -512,7 +512,8 @@ def get_keypoints(outputs, i):
     if len(bottom_object_idx) > 0:
         bottom_object = keypoints[bottom_object_idx[0]]
     
-    return left_hand, right_hand, top_object, bottom_object
+    labels = labels[left_hand_idx], labels[right_hand_idx], labels[top_object_idx], labels[bottom_object_idx]
+    return (left_hand, right_hand, top_object, bottom_object), labels
 
 
 def load_model(args, device):
@@ -524,6 +525,6 @@ def load_model(args, device):
     elif args.model_name == 'poseformer':
         model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2).to(device)
     elif args.model_name == 'thor':
-        model = THOR(device, num_frames=args.window_size, num_kps=84, rcnn_path=args.rcnn_path).to(device)
+        model = THOR(device, input_dim=26, num_frames=args.window_size, num_kps=84, rcnn_path=args.rcnn_path).to(device)
     
     return model
