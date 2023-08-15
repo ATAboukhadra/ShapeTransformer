@@ -354,6 +354,10 @@ class GraFormer(nn.Module):
         c = copy.deepcopy
         attn = MultiHeadedAttention(n_head, dim_model)
         gcn = GraphNet(in_features=dim_model, out_features=dim_model, num_pts=num_pts, temporal=temporal)
+        self.temporal = temporal
+        if temporal:
+            self.temporal_pos_embed = nn.Parameter(torch.zeros(1, num_pts, hid_dim))
+
         # Create a non-trainable copy from the same adjacency matrix used in LAM_Gconv to use in ChebGConv
         self.adj = Parameter(gcn.A_hat.data.clone(), requires_grad=False)
     
@@ -372,6 +376,9 @@ class GraFormer(nn.Module):
     def forward(self, x):
         self.mask = self.mask.to(x.device)
         out = self.gconv_input(x, self.adj)
+        if self.temporal:
+            out = out + self.temporal_pos_embed
+            
         for i in range(self.n_layers):
             out = self.atten_layers[i](out, self.mask)
             out = self.gconv_layers[i](out)
