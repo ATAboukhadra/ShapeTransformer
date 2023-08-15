@@ -34,9 +34,10 @@ class THOR(nn.Module):
             # self.temporal_encoder = Transformer(num_frames, num_kps=num_kps, input_dim=num_features, hid_dim=hid_dim, num_layers=4, normalize_before=True)
             self.temporal_encoder = GraFormer(hid_dim=temporal_dim, coords_dim=(num_features, 3 * num_kps), num_pts=num_frames, temporal=True)
 
-        # weights = ResNet18_Weights.DEFAULT
-        # full_resnet18 = resnet18(weights=weights, progress=False)
-        # self.resnet18 = torch.nn.Sequential(*list(full_resnet18.children())[:-1])
+        if self.input_dim > 2 + 24:
+            weights = ResNet18_Weights.DEFAULT
+            full_resnet18 = resnet18(weights=weights, progress=False)
+            self.resnet18 = torch.nn.Sequential(*list(full_resnet18.children())[:-1])
 
         # # 48 MANO Pose, 3 Translation, 7 Object Pose, additional per-frame features, 21 3D KPs
         # frame_output_dim = 3 * 2 + 45 * 2 + 3 * 2 + 7 + extra_features #+ 2 * 21 * 3
@@ -58,6 +59,13 @@ class THOR(nn.Module):
         one_hot = one_hot.unsqueeze(0).repeat(21, 1).to(self.device)
         return one_hot
 
+    def patch_features(self, image, box):
+        # Crop image around box
+        cropped_image = image[:, int(box[1]):int(box[3]), int(box[0]):int(box[2])].unsqueeze(0)
+        features = self.resnet18(cropped_image).squeeze(-1).squeeze(-1).squeeze(0)
+        return features
+
+
     def forward(self, batch_dict):
         bs, t = len(batch_dict['rgb']), batch_dict['rgb'][0].shape[0]
 
@@ -70,11 +78,12 @@ class THOR(nn.Module):
 
         graph = torch.zeros(bs * t, 4, 21, self.input_dim).to(self.device)
         for i in range(bs * t):
-            kps, labels = get_keypoints(rcnn_outputs, i)
+            kps, labels, boxes = get_keypoints(rcnn_outputs, i)
             for o in range(4):
                 if kps[o] is not None:
                     graph[i, o, :, :2] = kps[o][:, :2]
-                    if self.input_dim > 2: graph[i, o, :, 2:] = self.one_hot(labels[o]) 
+                    if self.input_dim > 2: graph[i, o, :, 2:26] = self.one_hot(labels[o]) 
+                    if self.input_dim > 26: graph[i, o, :, 26:] = self.patch_features(images[i], boxes[o])               
 
         graph = graph.view(bs * t, 4 * 21, self.input_dim)
         spatial_out = self.spatial_encoder(graph).view(bs, t, -1, self.spatial_output)

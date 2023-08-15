@@ -494,26 +494,42 @@ def load_weights(model, weights_path):
 def get_keypoints(outputs, i):
     keypoints = outputs[i]['keypoints']
     labels = outputs[i]['labels']
+    boxes = outputs[i]['boxes']
     left_hand, right_hand, top_object, bottom_object = None, None, None, None
+    left_hand_label, right_hand_label, top_object_label, bottom_object_label = None, None, None, None
+    left_hand_box, right_hand_box, top_object_box, bottom_object_box = None, None, None, None
     # Hands
     left_hand_idx = torch.where(labels == 22)[0]
     right_hand_idx = torch.where(labels == 23)[0]
     if len(left_hand_idx) > 0:
         left_hand = keypoints[left_hand_idx[0]]
+        left_hand_label = labels[left_hand_idx[0]]
+        left_hand_box = boxes[left_hand_idx[0]]
+
     if len(right_hand_idx) > 0:
         right_hand = keypoints[right_hand_idx[0]]
-    
+        right_hand_label = labels[right_hand_idx[0]]
+        right_hand_box = boxes[right_hand_idx[0]]
+
     # Objects
     top_object_idx = torch.where((labels < 22) & (labels % 2 == 0))[0]
     bottom_object_idx = torch.where((labels < 22) & (labels % 2 == 1))[0]
 
     if len(top_object_idx) > 0:
         top_object = keypoints[top_object_idx[0]]
+        top_object_label = labels[top_object_idx[0]]
+        top_object_box = boxes[top_object_idx[0]]
+
     if len(bottom_object_idx) > 0:
         bottom_object = keypoints[bottom_object_idx[0]]
-    
-    labels = labels[left_hand_idx], labels[right_hand_idx], labels[top_object_idx], labels[bottom_object_idx]
-    return (left_hand, right_hand, top_object, bottom_object), labels
+        bottom_object_label = labels[bottom_object_idx[0]]
+        bottom_object_box = boxes[bottom_object_idx[0]]
+
+    kps = left_hand, right_hand, top_object, bottom_object
+    labels = left_hand_label, right_hand_label, top_object_label, bottom_object_label
+    boxes = left_hand_box, right_hand_box, top_object_box, bottom_object_box
+
+    return kps, labels, boxes
 
 
 def load_model(args, device):
