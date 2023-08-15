@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from models.poseformer import PoseGraFormer
+from models.poseformer import PoseGraFormer, Transformer
 from torchvision.models import resnet18, ResNet18_Weights
 from torchvision import transforms
 from models.graformer import GraFormer
@@ -29,7 +29,10 @@ class THOR(nn.Module):
 
         num_features = spatial_dim * num_kps
         if num_frames > 1:
-            self.temporal_encoder = GraFormer(hid_dim=temporal_dim, coords_dim=(num_features, 3 * num_kps), num_pts=num_frames, temporal=True)
+            hid_dim = 128
+            self.temporal_encoder = Transformer(num_frames, num_kps=num_kps, input_dim=num_features, hid_dim=hid_dim, num_layers=4, normalize_before=True)
+                                    
+            # self.temporal_encoder = GraFormer(hid_dim=temporal_dim, coords_dim=(num_features, 3 * num_kps), num_pts=num_frames, temporal=True)
 
         # weights = ResNet18_Weights.DEFAULT
         # full_resnet18 = resnet18(weights=weights, progress=False)
@@ -76,5 +79,5 @@ class THOR(nn.Module):
         else:
             pose3d = spatial_out
             
-        return pose3d
+        return pose3d 
 

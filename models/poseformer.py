@@ -49,22 +49,31 @@ from models.graformer import GraFormer
 #         return self.dropout(x)
 
 class Transformer(nn.Module):
-    def __init__(self, num_tokens, hid_dim=32, num_layers=4, nhead=8, normalize_before=False) -> None:
+    def __init__(self, num_frames, num_kps=21, input_dim=2, hid_dim=128, output_dim=3, num_layers=4, nhead=8, normalize_before=False) -> None:
         super().__init__()
 
         self.embed_layer = nn.Linear(input_dim, hid_dim)
-        self.temporal_pos_embed = nn.Parameter(torch.zeros(1, num_tokens, hid_dim))
+        self.temporal_pos_embed = nn.Parameter(torch.zeros(1, num_frames, hid_dim))
         temporal_encoder_layer = nn.TransformerEncoderLayer(d_model=hid_dim, nhead=nhead, batch_first=False)
         temporal_encoder_norm = nn.LayerNorm(hid_dim) if normalize_before else None
         self.temporal_encoder = nn.TransformerEncoder(temporal_encoder_layer, num_layers=num_layers, norm=temporal_encoder_norm)
-    
+        self.pose_head = nn.Sequential(nn.BatchNorm1d(hid_dim),
+                                       nn.Linear(hid_dim, output_dim * num_kps)) #MLP(d_model, d_model, output_dim)
+
     def forward(self, src):
+
         bs, t, d = src.shape
+        
         src = src.view(bs * t, d)
         src = self.embed_layer(src)
-        src = src.view(bs, t, d)
+        src = src.view(bs, t, -1)
         src = src + self.temporal_pos_embed
+        
         src = self.temporal_encoder(src)
+        src = src.view(bs * t, -1)
+        src = self.pose_head(src)
+        src = src.view(bs, t, -1)
+        
         return src
 
 class PoseFormer(nn.Module):

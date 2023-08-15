@@ -100,7 +100,7 @@ def showHandJoints(imgInOrg, gtIn, filename=None, dataset_name='ho', mode='pred'
             if length < max_length and length > 5:
                 deg = math.degrees(math.atan2(x1 - x2, y1 - y2))
                 polygon = cv2.ellipse2Poly((int((y1 + y2) / 2), int((x1 + x2) / 2)),
-                                           (int(length / 2), 2),
+                                           (int(length / 2), 1),
                                            int(deg),
                                            0, 360, 1)
                 color_code_num = limb_num // 4
@@ -374,13 +374,7 @@ def plot_bb_ax(img, outputs, fig_config, subplot_id, plot_txt):
     ax.title.set_text(plot_txt)
     ax.imshow(bb_image)
 
-def plot_pose2d(img, keypoints3d, fig_config, subplot_id, plot_txt):
-
-    cam_mat = np.array(
-        [[617.343,0,      312.42],
-        [0,       617.343,241.42],
-        [0,       0,       1]
-    ])
+def plot_pose2d(img, keypoints3d, cam_mat, fig_config, subplot_id, plot_txt):
 
     keypoints = project_3D_points(cam_mat, keypoints3d, is_OpenGL_coords=False)
     # print(keypoints)
@@ -391,10 +385,11 @@ def plot_pose2d(img, keypoints3d, fig_config, subplot_id, plot_txt):
 
     # if not np.isnan(keypoints[0][0]):
     plt_image = showHandJoints(img, keypoints[:21])
+    plt_image = showHandJoints(plt_image, keypoints[21:42])
     
     # If pose is only 1 hand and object (HO3D)
     # if not np.isnan(keypoints[-1][0]):
-    plt_image = showObjJoints(plt_image, keypoints[-8:])
+    # plt_image = showObjJoints(plt_image, keypoints[-8:])
  
     ax.title.set_text(plot_txt)
     ax.imshow(plt_image)
@@ -446,7 +441,7 @@ def plot_pose3d(fig_config, plot_id, pose3d, text, mode='pred'):
     ax.set_zticks([])
 
     show3DHandJoints(ax, pose3d[:21], mode=mode, isOpenGLCoords=True)
-    # show3DObjCorners(ax, pose3d[21:], mode=mode, isOpenGLCoords=True)
+    show3DHandJoints(ax, pose3d[21:42], mode=mode, isOpenGLCoords=True)
 
     ax.title.set_text(text)
 
