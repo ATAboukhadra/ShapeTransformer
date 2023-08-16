@@ -11,7 +11,7 @@ from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 
 root = '/ds-av/public_datasets/arctic/td/sequential_resized_allocentric/'
 objects_root = 'dataset/arctic_objects'
-output_folder = '/checkpoints/rcnn_allocentric18/'
+output_folder = '/checkpoints/rcnn18_allocentric/'
 if not os.path.exists(output_folder): os.mkdir(output_folder)
 
 batch_size = 1
