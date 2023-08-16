@@ -60,7 +60,7 @@ def decode_dataset(pipe: IterDataPipe):
 
     return pipe
 
-def create_pipe(in_dir, objects_root, subset, mode, device, sliding_window_size, num_seqs, factory=None, arctic_decoder=None):
+def create_pipe(in_dir, objects_root, subset, mode, device, sliding_window_size, num_seqs=4, factory=None, arctic_decoder=None):
 
     # Make sure to create the factory only once. It reads the metadata file at construction time.
     if factory is None: factory = SequencePipelineCreator(in_dir)
