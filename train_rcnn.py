@@ -1,6 +1,6 @@
 import torchvision
 import torch
-from torchvision.models.detection import KeypointRCNN_ResNet50_FPN_Weights
+from torchvision.models.detection import KeypointRCNN, keypointrcnn_resnet50_fpn
 from dataset.arctic_pipeline import create_pipe
 from tqdm import tqdm
 from utils import AverageMeter
@@ -24,10 +24,10 @@ device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 backbone = 'resnet18'
 
 if backbone == 'resnet50':
-    model = torchvision.models.detection.keypointrcnn_resnet50_fpn(num_keypoints=num_kps, num_classes=24).to(device)
+    model = keypointrcnn_resnet50_fpn(num_keypoints=num_kps, num_classes=24).to(device)
 elif backbone == 'resnet18':
     backbone = resnet_fpn_backbone(backbone_name='resnet18', weights=ResNet18_Weights.DEFAULT, trainable_layers=5)
-    model = torchvision.models.detection.KeypointRCNN(backbone, num_classes=24, num_keypoints=num_kps).to(device)
+    model = KeypointRCNN(backbone, num_classes=24, num_keypoints=num_kps).to(device)
     
 
 train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', mode, 'cpu', sliding_window_size)
@@ -57,11 +57,11 @@ for e in range(epochs):
 
         if (i+1) % 1000 == 0:
             print(i+1, [(k, round(losses_counters[k].avg, 2)) for k in losses.keys()], flush=True)
-            torch.save(model.state_dict(), f'{output_folder}keypointrcnn_resnet50_fpn_{e}.pth')
+            torch.save(model.state_dict(), f'{output_folder}keypointrcnn_{backbone}_fpn_{e}.pth')
             for k in losses.keys():
                 losses_counters[k].reset()
     
-    torch.save(model.state_dict(), f'{output_folder}keypointrcnn_resnet50_fpn_{e}.pth')
+    torch.save(model.state_dict(), f'{output_folder}keypointrcnn_{backbone}_fpn_{e}.pth')
 
     losses_counters = {'loss_classifier': AverageMeter(), 'loss_box_reg': AverageMeter(), 'loss_keypoint': AverageMeter(), 'loss_objectness': AverageMeter(), 'loss_rpn_box_reg': AverageMeter()}
     with torch.no_grad():

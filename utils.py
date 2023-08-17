@@ -45,6 +45,7 @@ def parse_args():
     ap.add_argument("--num_workers", type=int, help="number of workers", default='8')
     ap.add_argument("--num_seqs", type=int, help="number of sequences in each workers shuffle buffer", default='4')
     ap.add_argument("--num_gpus", type=int, help="number of gpus to be used in multigpu case", default='1')
+    ap.add_argument("--input_dim", type=int, help="number of spatial features", default='2')
     ap.add_argument("--run_val", action='store_true', help="run validation epoch once before training")
     ap.add_argument("--hdf5", action='store_true', help="Load data from HDF5 file") 
     ap.add_argument("--causal", action='store_true', help="Use only previous frames")     
@@ -541,6 +542,6 @@ def load_model(args, device):
     elif args.model_name == 'poseformer':
         model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2).to(device)
     elif args.model_name == 'thor':
-        model = THOR(device, input_dim=26, num_frames=args.window_size, num_kps=84, rcnn_path=args.rcnn_path).to(device)
+        model = THOR(device, input_dim=args.input_dim, num_frames=args.window_size, num_kps=84, rcnn_path=args.rcnn_path).to(device)
     
     return model

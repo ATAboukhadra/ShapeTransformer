@@ -27,7 +27,7 @@ hand_faces = dataset.hand_faces
 model = load_model(args, device)
 model, start_epoch = load_weights(model, args.weights)
 
-min_error = 20
+min_error = 30
 
 for i, (_, data_dict) in tqdm(enumerate(loader), total=count // args.batch_size):
     if data_dict is None: continue
@@ -40,8 +40,9 @@ for i, (_, data_dict) in tqdm(enumerate(loader), total=count // args.batch_size)
     outputs = model(data_dict)
     # for i in tqdm(range(data_dict['rgb'][0].shape[0])):
     # print(outputs[:, target_idx, :21].shape, data_dict['left_pose3d'][:, target_idx].shape)
-    error = p_mpjpe(outputs[:, target_idx, :21], data_dict['left_pose3d'][:, target_idx]) * 1000
-    if error < min_error:
+    error = (mpjpe(outputs[:, target_idx, :21], data_dict['left_pose3d'][:, target_idx]) + \
+             (mpjpe(outputs[:, target_idx, 21:42], data_dict['right_pose3d'][:, target_idx]))) * 500
+    if error < 25:
         min_error = error
         print(f'New min error: {min_error}')
         fig = plt.figure(figsize=(20, 20))

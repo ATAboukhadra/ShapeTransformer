@@ -97,18 +97,17 @@ def showHandJoints(imgInOrg, gtIn, filename=None, dataset_name='ho', mode='pred'
             x2 = gtIn[limbs[limb_num][1], 1]
             y2 = gtIn[limbs[limb_num][1], 0]
             length = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
-            if length < max_length and length > 5:
-                deg = math.degrees(math.atan2(x1 - x2, y1 - y2))
-                polygon = cv2.ellipse2Poly((int((y1 + y2) / 2), int((x1 + x2) / 2)),
-                                           (int(length / 2), 1),
-                                           int(deg),
-                                           0, 360, 1)
-                color_code_num = limb_num // 4
+            deg = math.degrees(math.atan2(x1 - x2, y1 - y2))
+            polygon = cv2.ellipse2Poly((int((y1 + y2) / 2), int((x1 + x2) / 2)),
+                                        (int(length / 2), 1),
+                                        int(deg),
+                                        0, 360, 1)
+            color_code_num = limb_num // 4
 
-                limb_color = list(map(lambda x: x  + cf * (limb_num % 4), joint_color_code[color_code_num]))[::-1]
+            limb_color = list(map(lambda x: x  + cf * (limb_num % 4), joint_color_code[color_code_num]))[::-1]
 
 
-                cv2.fillConvexPoly(imgIn, polygon, color=limb_color)
+            cv2.fillConvexPoly(imgIn, polygon, color=limb_color)
 
     if filename is not None:
         cv2.imwrite(filename, cv2.cvtColor(imgIn, cv2.COLOR_RGB2BGR))
@@ -308,16 +307,16 @@ def show3DObjCorners(ax, verts, mode='pred', isOpenGLCoords=False):
     if isOpenGLCoords:
         verts = verts.dot(coordChangeMat.T)
 
-    jointConns = [[0, 1, 3, 2, 0], [4, 5, 7, 6, 4], [0, 4], [1, 5], [2, 6], [3,7]]
+    # jointConns = [[0, 1, 3, 2, 0], [4, 5, 7, 6, 4], [0, 4], [1, 5], [2, 6], [3,7]]
     
-    for i in range(len(jointConns)):
-        for j in range(len(jointConns[i]) - 1):
-            jntC = jointConns[i][j]
-            jntN = jointConns[i][j+1]
-            if mode == 'gt':
-                ax.plot([verts[jntC][0], verts[jntN][0]], [verts[jntC][1], verts[jntN][1]], [verts[jntC][2], verts[jntN][2]], color='k')
-            else:    
-                ax.plot([verts[jntC][0], verts[jntN][0]], [verts[jntC][1], verts[jntN][1]], [verts[jntC][2], verts[jntN][2]], color='y')
+    # for i in range(len(jointConns)):
+    #     for j in range(len(jointConns[i]) - 1):
+    #         jntC = jointConns[i][j]
+    #         jntN = jointConns[i][j+1]
+    #         if mode == 'gt':
+    #             ax.plot([verts[jntC][0], verts[jntN][0]], [verts[jntC][1], verts[jntN][1]], [verts[jntC][2], verts[jntN][2]], color='k')
+    #         else:    
+    #             ax.plot([verts[jntC][0], verts[jntN][0]], [verts[jntC][1], verts[jntN][1]], [verts[jntC][2], verts[jntN][2]], color='y')
 
     x = verts[:,0]
     y = verts[:,1]
@@ -386,6 +385,11 @@ def plot_pose2d(img, keypoints3d, cam_mat, fig_config, subplot_id, plot_txt):
     # if not np.isnan(keypoints[0][0]):
     plt_image = showHandJoints(img, keypoints[:21])
     plt_image = showHandJoints(plt_image, keypoints[21:42])
+    # ax.scatter(obj_kps2d[i, 2, :, 0], obj_kps2d[i, 2, :, 1], c='lightgreen', s=1)
+    # ax.scatter(obj_kps2d[i, 3, :, 0], obj_kps2d[i, 3, :, 1], c='gold', s=1)
+
+    ax.scatter(keypoints[42:63, 0], keypoints[42:63, 1], c='lightblue', s=1)
+    ax.scatter(keypoints[63:, 0], keypoints[63:, 1], c='peachpuff', s=1)
     
     # If pose is only 1 hand and object (HO3D)
     # if not np.isnan(keypoints[-1][0]):
@@ -442,6 +446,8 @@ def plot_pose3d(fig_config, plot_id, pose3d, text, mode='pred'):
 
     show3DHandJoints(ax, pose3d[:21], mode=mode, isOpenGLCoords=True)
     show3DHandJoints(ax, pose3d[21:42], mode=mode, isOpenGLCoords=True)
+    show3DObjCorners(ax, pose3d[42:63], mode='gt', isOpenGLCoords=True)
+    show3DObjCorners(ax, pose3d[63:], mode=mode, isOpenGLCoords=True)
 
     ax.title.set_text(text)
 
