@@ -107,7 +107,7 @@ class Stohrmer(nn.Module):
         # Output
         final_features = frame_outputs[:, :, 109:].reshape(bs, -1)
         outputs = self.output(final_features)
-        left_mano_shape, right_mano_shape, obj_class = outputs[:, :10], outputs[:, 10:20], outputs[:, 20:]
+        left_mano_shape, right_mano_shape, obj_class = outputs[:, :10].unsqueeze(1), outputs[:, 10:20].unsqueeze(1), outputs[:, 20:]
 
         outputs_dict = {
             'left_pose': left_mano_pose,

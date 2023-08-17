@@ -48,7 +48,7 @@ def main():
     dataset = decoder.dataset
     hand_faces = dataset.hand_faces
 
-    model = load_model(args, dh.local_rank)
+    model = load_model(args, dh.local_rank, target_idx)
 
     start_epoch = 0
     if args.weights:
@@ -69,7 +69,7 @@ def main():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
-    keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
+    keys = ['lm', 'lp', 'lpc', 'rm', 'rp', 'rpc', 'tm', 'bm', 'tk', 'bk', 'acc']
 
     total_count = train_count // (args.batch_size * dh.world_size)
 

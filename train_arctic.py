@@ -32,7 +32,7 @@ valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=args.batch_size
 dataset = decoder.dataset
 hand_faces = dataset.hand_faces
 
-model = load_model(args, device)
+model = load_model(args, device, target_idx)
 start_epoch = 0
 if args.weights:
     logger.info(f'Loading model from {args.weights}')
@@ -46,7 +46,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 L1 = torch.nn.L1Loss()
 CEL = torch.nn.CrossEntropyLoss()
 
-keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
+keys = ['lm', 'lp', 'lpc', 'rm', 'rp', 'rpc', 'tm', 'bm', 'tk', 'bk', 'acc']
 
 for e in range(start_epoch, args.epochs):
 

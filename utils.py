@@ -49,6 +49,7 @@ def parse_args():
     ap.add_argument("--run_val", action='store_true', help="run validation epoch once before training")
     ap.add_argument("--hdf5", action='store_true', help="Load data from HDF5 file") 
     ap.add_argument("--causal", action='store_true', help="Use only previous frames")     
+    ap.add_argument("--shape", action='store_true', help="generate ahdn and object mesh params")     
     ap.add_argument("--weights", type=str, default='', help="path to pretrained weights")
     ap.add_argument("--rcnn_path", type=str, default='', help="path to KP RCNN weights")
      
@@ -352,8 +353,13 @@ def calculate_loss(outputs, targets, target_idx=0):
     losses = {}
     hw = 0.01
     for side in ['left', 'right']:
-        mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans']#, targets[f'{side}_pose3d']
-        mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']#, outputs[f'{side}_pose3d']
+        if outputs[f'{side}_pose'].shape[1] > 1:
+            mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans'], targets[f'{side}_pose3d']
+            mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans'], outputs[f'{side}_pose3d']
+        else:
+            mano_gt = targets[f'{side}_pose'][:, target_idx], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans'][:, target_idx], targets[f'{side}_pose3d'][:, target_idx]
+            mano_pred = outputs[f'{side}_pose'][:, 0], outputs[f'{side}_shape'][:, 0], outputs[f'{side}_trans'][:, 0], outputs[f'{side}_pose3d'][:, 0]
+            
         loss = sum(L1(mano_gt[i], mano_pred[i]) * hw for i in range(len(mano_gt)))
         losses[f'{side}_mano'] = loss
 
@@ -361,9 +367,16 @@ def calculate_loss(outputs, targets, target_idx=0):
     obj_pose_gt = targets['obj_pose']
 
     ow = 0.1
-    loss = L1(obj_pose_gt, obj_pose_pred) * ow
-    obj_class_loss = CEL(obj_class, targets['label'][:, 0])
-    loss += obj_class_loss
+    loss = L1(obj_pose_gt, obj_pose_pred) * ow if obj_pose_pred.shape[1] > 1 else L1(obj_pose_gt[:, target_idx], obj_pose_pred[:, 0]) * ow
+    if outputs['bottom_kps3d'].shape[1] > 1:
+        top_pose_loss = mpjpe(outputs['top_kps3d'], targets['top_kps3d'])
+        bottom_pose_loss = mpjpe(outputs['bottom_kps3d'], targets['bottom_kps3d'])
+        
+    else:
+        top_pose_loss = mpjpe(outputs['top_kps3d'][:, 0], targets['top_kps3d'][:, target_idx])
+        bottom_pose_loss = mpjpe(outputs['bottom_kps3d'][:, 0], targets['bottom_kps3d'][:, target_idx])
+
+    loss += top_pose_loss + bottom_pose_loss 
     losses['obj'] = loss
         
     total_loss = sum(loss for loss in losses.values())
@@ -378,12 +391,12 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
     if not isinstance(outputs, dict):
         errors = calculate_pose_loss(outputs, targets, target_idx, mode='error')
 
-        metrics['left_pose_err'] = errors[0]
-        metrics['right_pose_err'] = errors[1]
+        metrics['lpc'] = errors[0]
+        metrics['rpc'] = errors[1]
 
         if len(errors) > 2:
-            metrics['top_obj_err'] = errors[2]
-            metrics['bottom_obj_err'] = errors[3]
+            metrics['tk'] = errors[2]
+            metrics['bk'] = errors[3]
 
         return metrics
 
@@ -394,7 +407,10 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
         mano_gt = [targets[f'{side}_pose'], targets[f'{side}_shape'], targets[f'{side}_trans']]
         mano_pred = [outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']]
 
-        mano_pred[1] = mano_pred[1].unsqueeze(1).repeat(1, t, 1)
+        mano_pred[1] = mano_pred[1].repeat(1, t, 1)
+        if mano_pred[2].shape[1] == 1:
+            mano_pred[2] = mano_pred[2].repeat(1, t, 1)
+            mano_pred[0] = mano_pred[0].repeat(1, t, 1)
 
         for i in range(len(mano_gt)):
             mano_gt[i] = mano_gt[i].view(bs * t, mano_gt[i].shape[-1])
@@ -412,17 +428,22 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
         # Calculate hand mesh error for only the middle frame or the last frame
         mesh_err = mpjpe(mesh_pred[:, target_idx], mesh_gt[:, target_idx]) * 1000
         pose_err = mpjpe(pose_pred[:, target_idx], pose_gt[:, target_idx]) * 1000
+        
+        pose3d_err = mpjpe(outputs[f'{side}_pose3d'][:, target_idx], targets[f'{side}_pose3d'][:, target_idx]) * 1000
 
-        metrics[f'{side}_mesh_err'] = mesh_err
-        metrics[f'{side}_pose_err'] = pose_err
+        metrics[f'{side[0]}m'] = mesh_err
+        metrics[f'{side[0]}p'] = pose_err
+        metrics[f'{side[0]}pc'] = pose3d_err
 
     obj_pose, obj_class = outputs['obj_pose'], outputs['obj_class']
+    if obj_pose.shape[1] == 1:
+        obj_pose = obj_pose.repeat(1, t, 1)
 
     # Calculate object class accuracy
     pred_labels = torch.argmax(obj_class, dim=1)
     pred_object_names = [dataset.object_names[l] for l in pred_labels]
     acc = (pred_labels == targets['label'][:, 0]).float().mean()
-    metrics['obj_acc'] = acc
+    metrics['acc'] = acc
 
     # Calculate object mesh error
     obj_pred = obj_pose[:, :, :1], obj_pose[:, :, 1:4], obj_pose[:, :, 4:]
@@ -442,13 +463,15 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
             else:
                 obj_mesh_err = mpjpe(obj_verts_pred[part][target_idx], obj_verts_gt[part][target_idx]) * 1000
 
-            metrics[f'{part}_obj_err'] = metrics[f'{part}_obj_err'] + obj_mesh_err if f'{part}_obj_err' in metrics.keys() else obj_mesh_err
+            metrics[f'{part[0]}m'] = metrics[f'{part}_mesh'] + obj_mesh_err if f'{part}_mesh' in metrics.keys() else obj_mesh_err
+            kps_err = mpjpe(outputs[f'{part}_kps3d'][i, target_idx], targets[f'{part}_kps3d'][i, target_idx]) * 1000
+            metrics[f'{part[0]}k'] = kps_err
 
     return metrics
 
 def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger, e, device, dh=None):
 
-    keys = ['left_mesh_err', 'left_pose_err', 'right_mesh_err', 'right_pose_err', 'top_obj_err', 'bottom_obj_err', 'obj_acc']
+    keys = ['lm', 'lp', 'lpc', 'rm', 'rp', 'rpc', 'tm', 'bm', 'tk', 'bk', 'acc']
     errors = {k: AverageMeter() for k in keys}
     
     master_condition = dh is None or (dh is not None and dh.is_master)
@@ -533,7 +556,7 @@ def get_keypoints(outputs, i):
     return kps, labels, boxes
 
 
-def load_model(args, device):
+def load_model(args, device, target_idx):
     from models.model_poseformer import PoseTransformer
     from models.thor import THOR
     from models.Stohrmer import Stohrmer
@@ -542,6 +565,6 @@ def load_model(args, device):
     elif args.model_name == 'poseformer':
         model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2).to(device)
     elif args.model_name == 'thor':
-        model = THOR(device, input_dim=args.input_dim, num_frames=args.window_size, num_kps=84, rcnn_path=args.rcnn_path).to(device)
+        model = THOR(device, input_dim=args.input_dim, num_frames=args.window_size, num_kps=84, rcnn_path=args.rcnn_path, shape=args.shape, target_idx=target_idx).to(device)
     
     return model
