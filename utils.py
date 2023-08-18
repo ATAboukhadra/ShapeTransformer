@@ -49,9 +49,8 @@ def parse_args():
     ap.add_argument("--run_val", action='store_true', help="run validation epoch once before training")
     ap.add_argument("--hdf5", action='store_true', help="Load data from HDF5 file") 
     ap.add_argument("--causal", action='store_true', help="Use only previous frames")     
-    ap.add_argument("--shape", action='store_true', help="generate ahdn and object mesh params")     
     ap.add_argument("--weights", type=str, default='', help="path to pretrained weights")
-    ap.add_argument("--rcnn_path", type=str, default='', help="path to KP RCNN weights")
+    ap.add_argument("--backbone_path", type=str, default='', help="path to backbone network or subnetwork")
      
 
     return ap.parse_args()
@@ -348,17 +347,17 @@ def calculate_pose_loss(outputs, targets, target_idx=0, mode='loss'):
 
 def calculate_loss(outputs, targets, target_idx=0):
     if not isinstance(outputs, dict):
-        return calculate_pose_loss(outputs, targets, target_idx)
+        return calculate_pose_loss(outputs[0], targets, target_idx)
 
     losses = {}
     hw = 0.01
     for side in ['left', 'right']:
         if outputs[f'{side}_pose'].shape[1] > 1:
-            mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans'], targets[f'{side}_pose3d']
-            mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans'], outputs[f'{side}_pose3d']
+            mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans']#, targets[f'{side}_pose3d']
+            mano_pred = outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']#, outputs[f'{side}_pose3d']
         else:
-            mano_gt = targets[f'{side}_pose'][:, target_idx], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans'][:, target_idx], targets[f'{side}_pose3d'][:, target_idx]
-            mano_pred = outputs[f'{side}_pose'][:, 0], outputs[f'{side}_shape'][:, 0], outputs[f'{side}_trans'][:, 0], outputs[f'{side}_pose3d'][:, 0]
+            mano_gt = targets[f'{side}_pose'][:, target_idx], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans'][:, target_idx]#, targets[f'{side}_pose3d'][:, target_idx]
+            mano_pred = outputs[f'{side}_pose'][:, 0], outputs[f'{side}_shape'][:, 0], outputs[f'{side}_trans'][:, 0]#, outputs[f'{side}_pose3d'][:, 0]
             
         loss = sum(L1(mano_gt[i], mano_pred[i]) * hw for i in range(len(mano_gt)))
         losses[f'{side}_mano'] = loss
@@ -368,15 +367,15 @@ def calculate_loss(outputs, targets, target_idx=0):
 
     ow = 0.1
     loss = L1(obj_pose_gt, obj_pose_pred) * ow if obj_pose_pred.shape[1] > 1 else L1(obj_pose_gt[:, target_idx], obj_pose_pred[:, 0]) * ow
-    if outputs['bottom_kps3d'].shape[1] > 1:
-        top_pose_loss = mpjpe(outputs['top_kps3d'], targets['top_kps3d'])
-        bottom_pose_loss = mpjpe(outputs['bottom_kps3d'], targets['bottom_kps3d'])
+    # if outputs['bottom_kps3d'].shape[1] > 1:
+    #     top_pose_loss = mpjpe(outputs['top_kps3d'], targets['top_kps3d'])
+    #     bottom_pose_loss = mpjpe(outputs['bottom_kps3d'], targets['bottom_kps3d'])
         
-    else:
-        top_pose_loss = mpjpe(outputs['top_kps3d'][:, 0], targets['top_kps3d'][:, target_idx])
-        bottom_pose_loss = mpjpe(outputs['bottom_kps3d'][:, 0], targets['bottom_kps3d'][:, target_idx])
+    # else:
+    #     top_pose_loss = mpjpe(outputs['top_kps3d'][:, 0], targets['top_kps3d'][:, target_idx])
+    #     bottom_pose_loss = mpjpe(outputs['bottom_kps3d'][:, 0], targets['bottom_kps3d'][:, target_idx])
 
-    loss += top_pose_loss + bottom_pose_loss 
+    # loss += top_pose_loss + bottom_pose_loss 
     losses['obj'] = loss
         
     total_loss = sum(loss for loss in losses.values())
@@ -389,7 +388,7 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
     metrics = {}
 
     if not isinstance(outputs, dict):
-        errors = calculate_pose_loss(outputs, targets, target_idx, mode='error')
+        errors = calculate_pose_loss(outputs[0], targets, target_idx, mode='error')
 
         metrics['lpc'] = errors[0]
         metrics['rpc'] = errors[1]
@@ -560,11 +559,14 @@ def load_model(args, device, target_idx):
     from models.model_poseformer import PoseTransformer
     from models.thor import THOR
     from models.Stohrmer import Stohrmer
+    from models.ShapeTHOR import ShapeTHOR
+
     if args.model_name == 'stohrmer':
         model = Stohrmer(device, num_kps=42, num_frames=args.window_size).to(device)
     elif args.model_name == 'poseformer':
         model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2).to(device)
     elif args.model_name == 'thor':
-        model = THOR(device, input_dim=args.input_dim, num_frames=args.window_size, num_kps=84, rcnn_path=args.rcnn_path, shape=args.shape, target_idx=target_idx).to(device)
-    
+        model = THOR(device, input_dim=args.input_dim, num_frames=args.window_size, num_kps=84, rcnn_path=args.backbone_path, target_idx=target_idx).to(device)
+    elif args.model_name == 'shapethor':
+        model = ShapeTHOR(device, input_dim=args.input_dim, num_frames=args.window_size, num_kps=84, thor_path=args.backbone_path, target_idx=target_idx).to(device)
     return model
