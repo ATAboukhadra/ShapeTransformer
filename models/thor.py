@@ -92,7 +92,7 @@ class THOR(nn.Module):
             for o in range(4):
                 if kps[o] is not None:
                     graph[i, o, :, :2] = kps[o][:, :2]
-                    if i % t == 0 and o == 2: obj_class[i % t, labels[o] // 2] = 1 # One hot
+                    if i % t == 0 and o == 2: obj_class[i // t, labels[o] // 2] = 1 # One hot
                     if self.input_dim > 2: graph[i, o, :, 2:26] = self.one_hot(labels[o])
                     if self.input_dim > 26: graph[i, o, :, 26:] = self.patch_features(images[i], boxes[o])               
 

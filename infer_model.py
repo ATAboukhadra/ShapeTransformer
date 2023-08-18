@@ -24,7 +24,7 @@ loader = torch.utils.data.DataLoader(pipeline, batch_size=args.batch_size, num_w
 dataset = decoder.dataset
 hand_faces = dataset.hand_faces
 
-model = load_model(args, device)
+model = load_model(args, device, target_idx)
 model, start_epoch = load_weights(model, args.weights)
 
 min_error = 30
@@ -42,7 +42,7 @@ for i, (_, data_dict) in tqdm(enumerate(loader), total=count // args.batch_size)
     # print(outputs[:, target_idx, :21].shape, data_dict['left_pose3d'][:, target_idx].shape)
     error = (mpjpe(outputs[:, target_idx, :21], data_dict['left_pose3d'][:, target_idx]) + \
              (mpjpe(outputs[:, target_idx, 21:42], data_dict['right_pose3d'][:, target_idx]))) * 500
-    if error < 25:
+    if error < min_error:
         min_error = error
         print(f'New min error: {min_error}')
         fig = plt.figure(figsize=(20, 20))
