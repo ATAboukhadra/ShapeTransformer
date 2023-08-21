@@ -322,7 +322,7 @@ class LAM_Gconv(nn.Module):
 
 class GraphNet(nn.Module):
 
-    def __init__(self, in_features=2, out_features=2, num_pts=29, temporal=False):
+    def __init__(self, in_features=2, out_features=2, num_pts=29, temporal=False, trainable_adj=True):
         super(GraphNet, self).__init__()
 
         if temporal:
@@ -332,7 +332,7 @@ class GraphNet(nn.Module):
 
         adj = adj_mx_from_edges(edges = edges, num_pts = num_pts) 
 
-        self.A_hat = Parameter(adj.float(), requires_grad=True)   
+        self.A_hat = Parameter(adj.float(), requires_grad=trainable_adj)   
 
         self.gconv1 = LAM_Gconv(in_features, in_features * 2)
         self.gconv2 = LAM_Gconv(in_features * 2, out_features, activation=None)
@@ -343,7 +343,7 @@ class GraphNet(nn.Module):
         return X_1
 
 class GraFormer(nn.Module):
-    def __init__(self, hid_dim=128, coords_dim=(2, 3), num_layers=4, n_head=4,  dropout=0.1, num_pts=29, temporal=False):
+    def __init__(self, hid_dim=128, coords_dim=(2, 3), num_layers=4, n_head=4,  dropout=0.1, num_pts=29, temporal=False, trainable_adj=True):
         super(GraFormer, self).__init__()
         self.n_layers = num_layers
         # self.n_pts = num_pts
@@ -353,7 +353,7 @@ class GraFormer(nn.Module):
         dim_model = hid_dim
         c = copy.deepcopy
         attn = MultiHeadedAttention(n_head, dim_model)
-        gcn = GraphNet(in_features=dim_model, out_features=dim_model, num_pts=num_pts, temporal=temporal)
+        gcn = GraphNet(in_features=dim_model, out_features=dim_model, num_pts=num_pts, temporal=temporal, trainable_adj=trainable_adj)
         self.temporal = temporal
         if temporal:
             self.temporal_pos_embed = nn.Parameter(torch.zeros(1, num_pts, hid_dim))

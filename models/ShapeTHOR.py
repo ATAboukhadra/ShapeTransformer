@@ -17,12 +17,14 @@ class ShapeTHOR(nn.Module):
         self.thor = THOR(device, input_dim=input_dim, num_frames=num_frames, num_kps=num_kps)
         if thor_path != '': self.thor.load_state_dict(torch.load(thor_path))
         self.thor.eval()
+        # for param in self.thor.parameters():
+        #     param.requires_grad = False
 
         self.target_idx = target_idx
         self.input_dim = input_dim
         self.mano_params = 48 + 10 + 3
         self.obj_pose = 7
-        self.shape_graformer = GraFormer(num_pts=84, hid_dim=32, coords_dim=(self.input_dim + 1, self.mano_params + self.obj_pose))
+        self.shape_graformer = GraFormer(num_pts=84, hid_dim=32, coords_dim=(self.input_dim + 1, self.mano_params + self.obj_pose), trainable_adj=False, temporal=True)
 
     def decode_mano(self, pose, shape, trans, side, cam_ext):
         verts_world, kps_world = self.mano_layers[side](pose, shape, trans)
@@ -62,6 +64,13 @@ class ShapeTHOR(nn.Module):
             'obj_pose': obj_pose,
             'obj_class': labels
         }
+        # check for nan in left pose
+        if torch.isnan(outputs_dict['left_pose']).any():
+            print('left pose is nan')
+            # check if the inputs in batch_dict are tensors and if the contain nan
+            for k in batch_dict.keys():
+                if isinstance(batch_dict[k], torch.Tensor) and torch.isnan(batch_dict[k]).any():
+                    print(k, 'is nan')
         
         return outputs_dict
         

@@ -111,7 +111,7 @@ def main():
             if (i+1) % args.log_interval == 0 and dh.is_master:
                 error_list = [f'{k}: {v.avg:.2f}' for k, v in errors.items()]
                 logger.info(f'\nEpoch {e} [{i+1} / {total_count}]: {error_list}')
-                errors = {k: AverageMeter() for k in keys}
+                # errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
             # if dh.is_master: break
