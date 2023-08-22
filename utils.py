@@ -416,7 +416,7 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
             mano_pred[i] = mano_pred[i].view(bs * t, mano_pred[i].shape[-1])
 
         mesh_gt, pose_gt = model.decode_mano(mano_gt[0], mano_gt[1], mano_gt[2], side, cam_ext)
-        mesh_pred, pose_pred = model.decode_mano(mano_gt[0], mano_pred[1], mano_pred[2], side, cam_ext)
+        mesh_pred, pose_pred = model.decode_mano(mano_pred[0], mano_pred[1], mano_pred[2], side, cam_ext)
         
         mesh_gt = mesh_gt.view(bs, t, -1, 3)
         mesh_pred = mesh_pred.view(bs, t, -1, 3)
