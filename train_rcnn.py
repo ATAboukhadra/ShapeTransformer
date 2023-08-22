@@ -9,9 +9,17 @@ from datapipes.utils.collation_functions import collate_sequences_as_dicts
 from torchvision.models import resnet18, ResNet18_Weights
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 
-root = '/ds-av/public_datasets/arctic/td/sequential_resized_allocentric/'
+root = '/ds-av/public_datasets/arctic/td/sequential_resized_egocentric/'
+
+if 'allocentric' in root:
+    mode = 'allocentric'
+elif 'egocentric' in root:
+    mode = 'egocentric'
+else:
+    mode = 'all'
+    
 objects_root = 'dataset/arctic_objects'
-output_folder = '/checkpoints/rcnn18_allocentric/'
+output_folder = f'/checkpoints/rcnn50_{mode}/'
 if not os.path.exists(output_folder): os.mkdir(output_folder)
 
 batch_size = 1
@@ -19,9 +27,8 @@ num_workers = 4
 sliding_window_size = 1
 epochs = 5
 num_kps = 21 
-mode = 'allocentric' if 'allocentric' in root else 'all'
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-backbone = 'resnet18'
+backbone = 'resnet50'
 
 if backbone == 'resnet50':
     model = keypointrcnn_resnet50_fpn(num_keypoints=num_kps, num_classes=24).to(device)

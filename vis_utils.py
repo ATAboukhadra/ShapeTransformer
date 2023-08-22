@@ -449,9 +449,13 @@ def plot_pose3d(fig_config, plot_id, pose3d, text, mode='pred'):
     show3DObjCorners(ax, pose3d[42:63], mode='gt', isOpenGLCoords=True)
     show3DObjCorners(ax, pose3d[63:], mode=mode, isOpenGLCoords=True)
 
+    coordChangeMat = np.array([[1., 0., 0.], [0, -1., 0.], [0., 0., -1.]], dtype=np.float32)
+    cam_equal_aspect_3d(ax, pose3d.dot(coordChangeMat.T), flip_x=False)
+
+    ax.view_init(elev=-90, azim=-90)
     ax.title.set_text(text)
 
-def plot_mesh3d(outputs, right_hand_faces, obj_faces, fig_config, subplot_id, plot_txt, left_hand_faces=None, center=None, idx=0):
+def plot_mesh3d(mesh3d, faces, fig_config, subplot_id, plot_txt):
     
     fig, H, W = fig_config
     ax = fig.add_subplot(H, W, subplot_id, projection="3d")
@@ -464,24 +468,12 @@ def plot_mesh3d(outputs, right_hand_faces, obj_faces, fig_config, subplot_id, pl
     ax.set_yticks([])
     ax.set_zticks([])
 
-    mesh3d = outputs['mesh3d'][idx][:, :3]
-    num_verts = mesh3d.shape[0]
-
-    if center is not None:
-        mesh3d += center
+    plot3dVisualize(ax, mesh3d[:778], faces['left'], flip_x=False, isOpenGLCoords=True, c="r")
+    plot3dVisualize(ax, mesh3d[778:778*2], faces['right'], flip_x=False, isOpenGLCoords=True, c="g")
+    coordChangeMat = np.array([[1., 0., 0.], [0, -1., 0.], [0., 0., -1.]], dtype=np.float32)
+    cam_equal_aspect_3d(ax, mesh3d.dot(coordChangeMat.T), flip_x=False)
     
-    if num_verts <= 1778 :
-        plot3dVisualize(ax, mesh3d[:778], right_hand_faces, flip_x=False, isOpenGLCoords=False, c="r")
-    
-    if num_verts == 1778:
-        plot3dVisualize(ax, mesh3d[778:], obj_faces, flip_x=False, isOpenGLCoords=False, c="b")
-
-    if num_verts > 1778:
-        plot3dVisualize(ax, mesh3d[:778], left_hand_faces, flip_x=False, isOpenGLCoords=False, c="r")
-        plot3dVisualize(ax, mesh3d[778:778*2], right_hand_faces, flip_x=False, isOpenGLCoords=False, c="g")
-        plot3dVisualize(ax, mesh3d[778*2:], obj_faces, flip_x=False, isOpenGLCoords=False, c="b")
-
-    cam_equal_aspect_3d(ax, mesh3d, flip_x=False)
+    ax.view_init(elev=-90, azim=-90)
     ax.title.set_text(plot_txt)
 
 def plot_pose_heatmap(img, predictions, idx, center, fig_config, plot_id):
