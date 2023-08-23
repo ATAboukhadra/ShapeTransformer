@@ -25,7 +25,7 @@ class ShapeTHOR(nn.Module):
         self.input_dim = input_dim
         self.mano_params = 48 + 10 + 3
         self.obj_pose = 7
-        self.shape_graformer = GraFormer(num_pts=84, hid_dim=32, coords_dim=(self.input_dim + 1, self.mano_params + self.obj_pose), trainable_adj=False, temporal=True)
+        self.shape_graformer = GraFormer(num_pts=84, hid_dim=32, coords_dim=(self.input_dim + 1, self.mano_params + self.obj_pose), trainable_adj=False)
 
     def reload_backbone(self):
         if self.backbone_path != '': 
