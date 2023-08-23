@@ -560,13 +560,17 @@ def load_model(args, device, target_idx):
     from models.thor import THOR
     from models.Stohrmer import Stohrmer
     from models.ShapeTHOR import ShapeTHOR
-
+    from models.TemporalTHOR import TemporalTHOR
     if args.model_name == 'stohrmer':
         model = Stohrmer(device, num_kps=42, num_frames=args.window_size).to(device)
     elif args.model_name == 'poseformer':
         model = PoseTransformer(num_frame=args.window_size, num_joints=42, in_chans=2).to(device)
     elif args.model_name == 'thor':
-        model = THOR(device, input_dim=args.input_dim, num_frames=args.window_size, num_kps=84, rcnn_path=args.backbone_path, target_idx=target_idx).to(device)
+        if args.window_size == 1:
+            model = THOR(device, input_dim=args.input_dim, num_frames=args.window_size, num_kps=84, rcnn_path=args.backbone_path, target_idx=target_idx).to(device)
+        else:
+            model = TemporalTHOR(device, input_dim=args.input_dim, num_frames=args.window_size, num_kps=84, thor_path=args.backbone_path).to(device)
+    
     elif args.model_name == 'shapethor':
         model = ShapeTHOR(device, input_dim=args.input_dim, num_frames=args.window_size, num_kps=84, thor_path=args.backbone_path, target_idx=target_idx).to(device)
     return model

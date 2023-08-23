@@ -20,16 +20,16 @@ class THOR(nn.Module):
             self.obj_rcnn.load_state_dict(torch.load(rcnn_path))
         self.obj_rcnn.eval()
 
-        self.spatial_output = 3 if num_frames == 1 else spatial_dim
+        self.spatial_output = 3 # if num_frames == 1 else spatial_dim
         self.input_dim = input_dim
         self.spatial_encoder = GraFormer(num_pts=num_kps, coords_dim=(self.input_dim, self.spatial_output))
 
 
         num_features = spatial_dim * num_kps
-        if num_frames > 1:
-            hid_dim = 128
-            # self.temporal_encoder = Transformer(num_frames, num_kps=num_kps, input_dim=num_features, hid_dim=hid_dim, num_layers=4, normalize_before=True)
-            self.temporal_encoder = GraFormer(hid_dim=temporal_dim, coords_dim=(num_features, 3 * num_kps), num_pts=num_frames, temporal=True)
+        # if num_frames > 1:
+        #     hid_dim = 128
+        #     # self.temporal_encoder = Transformer(num_frames, num_kps=num_kps, input_dim=num_features, hid_dim=hid_dim, num_layers=4, normalize_before=True)
+        #     self.temporal_encoder = GraFormer(hid_dim=temporal_dim, coords_dim=(num_features, 3 * num_kps), num_pts=num_frames, temporal=True)
 
         if self.input_dim > 2 + 24:
             weights = ResNet18_Weights.DEFAULT
@@ -86,10 +86,10 @@ class THOR(nn.Module):
         graph = graph.view(bs * t, 4 * 21, self.input_dim)
         spatial_out = self.spatial_encoder(graph).view(bs, t, -1, self.spatial_output)
 
-        if t > 1:
-            temporal_out = self.temporal_encoder(spatial_out.view(bs, t, -1)).view(bs, t, -1, 3)
-            pose3d = temporal_out
-        else:
-            pose3d = spatial_out
+        # if t > 1:
+        #     temporal_out = self.temporal_encoder(spatial_out.view(bs, t, -1)).view(bs, t, -1, 3)
+        #     pose3d = temporal_out
+        # else:
+        pose3d = spatial_out
         
         return pose3d, graph, obj_class
