@@ -14,6 +14,7 @@ class ShapeTHOR(nn.Module):
         mano_layer_left = ManoLayer(mano_root='mano_v1_2/models', ncomps=45, flat_hand_mean=False, use_pca=False, side='left').to(device)
         self.mano_layers = {'right': mano_layer_right, 'left': mano_layer_left}
 
+        self.backbone_path = thor_path
         self.thor = THOR(device, input_dim=input_dim, num_frames=num_frames, num_kps=num_kps)
         if thor_path != '': self.thor.load_state_dict(torch.load(thor_path))
         self.thor.eval()
@@ -25,6 +26,11 @@ class ShapeTHOR(nn.Module):
         self.mano_params = 48 + 10 + 3
         self.obj_pose = 7
         self.shape_graformer = GraFormer(num_pts=84, hid_dim=32, coords_dim=(self.input_dim + 1, self.mano_params + self.obj_pose), trainable_adj=False, temporal=True)
+
+    def reload_backbone(self):
+        if self.backbone_path != '': 
+            self.thor.load_state_dict(torch.load(self.backbone_path))
+            # self.thor.eval()
 
     def decode_mano(self, pose, shape, trans, side, cam_ext):
         verts_world, kps_world = self.mano_layers[side](pose, shape, trans)

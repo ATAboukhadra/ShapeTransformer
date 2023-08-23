@@ -248,7 +248,7 @@ def show3DHandJoints(ax, verts, mode='pred', isOpenGLCoords=False):
     :param ax: matplotlib axis
     :param verts: ground truth annotation
     '''
-    ax.axis('off')
+    # ax.axis('off')
     coordChangeMat = np.array([[1., 0., 0.], [0, -1., 0.], [0., 0., -1.]], dtype=np.float32)
     if isOpenGLCoords:
         verts = verts.dot(coordChangeMat.T)
@@ -568,26 +568,6 @@ def read_obj(filename):
 
     return result
 
-
-def db_size(set_name, version='v2'):
-    """ Hardcoded size of the datasets. """
-    if set_name == 'train':
-        if version == 'v2':
-            return 66034  # number of unique samples (they exists in multiple 'versions')
-        elif version == 'v3':
-            return 78297
-        else:
-            raise NotImplementedError
-    elif set_name == 'evaluation':
-        if version == 'v2':
-            return 11524
-        elif version == 'v3':
-            return 20137
-        else:
-            raise NotImplementedError
-    else:
-        assert 0, 'Invalid choice.'
-
 def load_pickle_data(f_name):
     """ Loads the pickle data """
     if not os.path.exists(f_name):
@@ -622,93 +602,41 @@ def project_3D_points(cam_mat, pts3D, is_OpenGL_coords=True):
 
     return proj_pts
 
-def read_RGB_img(base_dir, seq_name, file_id, split):
-    """Read the RGB image in dataset"""
-    if os.path.exists(os.path.join(base_dir, split, seq_name, 'rgb', file_id + '.png')):
-        img_filename = os.path.join(base_dir, split, seq_name, 'rgb', file_id + '.png')
-    else:
-        img_filename = os.path.join(base_dir, split, seq_name, 'rgb', file_id + '.jpg')
-
-    _assert_exist(img_filename)
-
-    img = cv2.imread(img_filename)
-
-    return img
-
-
-def read_depth_img(base_dir, seq_name, file_id, split):
-    """Read the depth image in dataset and decode it"""
-    depth_filename = os.path.join(base_dir, split, seq_name, 'depth', file_id + '.png')
-
-    _assert_exist(depth_filename)
-
-    depth_scale = 0.00012498664727900177
-    depth_img = cv2.imread(depth_filename)
-
-    dpt = depth_img[:, :, 2] + depth_img[:, :, 1] * 256
-    dpt = dpt * depth_scale
-
-    return dpt
-
-def read_annotation(base_dir, seq_name, file_id, split):
-    meta_filename = os.path.join(base_dir, split, seq_name, 'meta', file_id + '.pkl')
-
-    _assert_exist(meta_filename)
-
-    pkl_data = load_pickle_data(meta_filename)
-
-    return pkl_data
-
-
-def load_faces():
+def save_mesh(mesh3d, faces, key, err=0):
+    seq_name = '_'.join(key.split('/')[:-1])
+    if not os.path.exists(f'output/meshes/{seq_name}'):
+        os.makedirs(f'output/meshes/{seq_name}')
     
-    # Load right hand faces
-    mano_layer = ManoLayer(mano_root='../mano_v1_2/models', use_pca=False, ncomps=6, flat_hand_mean=True)
-    right_hand_faces = mano_layer.th_faces
-
-    # Loading object faces
-    obj_mesh = read_obj('../datasets/objects/mesh_1000/book.obj')
-    obj_faces = obj_mesh.f
-
-    # Load left hand faces
-    mano_layer = ManoLayer(mano_root='../mano_v1_2/models', side='left', use_pca=False, ncomps=6, flat_hand_mean=True)
-    left_hand_faces = mano_layer.th_faces
+    pred=False
+    frame_name = key.split('/')[-1].split('.')[0]
+    file_name = f'output/meshes/{seq_name}/{frame_name}'
+    if err > 0: 
+        file_name += f'_{int(err)}'
+        pred = True
     
-    return left_hand_faces, right_hand_faces, obj_faces
+    faces = np.concatenate((faces['left'], faces['right'] + 778), axis = 0)
+
+    write_obj(mesh3d, faces, file_name, pred)
 
 
-def save_mesh(outputs, filename, right_hand_faces, obj_faces, idx=0, texture=None, shape_dir='mesh', left_hand_faces=None):
-
-    predicted_keypoints3d = outputs['mesh3d'][idx][:, :3]
-    num_verts = outputs['mesh3d'][idx].shape[0]
-
-    final_obj = filename.replace('visual_results', shape_dir).replace('.jpg', '').replace('.png', '')
-    
-    if outputs['mesh3d'][idx].shape[1] == 6:
-        texture = outputs['mesh3d'][idx][:, 3:]
-    else:
-        texture = None
-
-    # Disable object texture
-    # texture[-1000:, :] = 0.5
-    
-    if num_verts == 2556:
-        final_faces = np.concatenate((left_hand_faces, right_hand_faces + 778,  obj_faces + 778 * 2), axis = 0)
-    elif num_verts == 1778:
-        final_faces = np.concatenate((right_hand_faces, obj_faces + 778), axis = 0)
-    else:
-        final_faces = right_hand_faces
-
-    write_obj(predicted_keypoints3d, final_faces, final_obj, texture)
-
-
-def write_obj(verts, faces, filename, texture=None):
+def write_obj(verts, faces, filename, pred=True):
     """Saves and obj file using vertices and faces"""
-    if 'gt' in filename:
-        texture = np.zeros_like(verts)
-        texture[:, 0] = 35 / 255
-        texture[:, 1] = 120 / 255
-        texture[:, 2] = 65 / 255
+    # if 'gt' in filename:
+    texture = np.zeros_like(verts)
+
+    if pred:
+        texture[:778, 0] = 0
+        texture[:778, 1] = 0.5
+        texture[:778, 2] = 1
+
+        texture[778:, 0] = 0
+        texture[778:, 1] = 1
+        texture[778:, 2] = 0.5
+
+    else:
+        texture[:, 0] = 0.7
+        texture[:, 1] = 0.7
+        texture[:, 2] = 0.7
 
     if texture is not None:
         alpha = np.ones((verts.shape[0], 1))

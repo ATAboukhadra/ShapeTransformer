@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import torch
 import numpy as np
 from render_utils import create_renderer, render_arctic_mesh
-from vis_utils import plot_pose3d, plot_pose2d, plot_mesh3d
+from vis_utils import plot_pose3d, plot_pose2d, plot_mesh3d, save_mesh
 from dataset.arctic_pipeline import create_pipe
 from tqdm import tqdm
 from models.Stohrmer import Stohrmer
@@ -11,27 +11,38 @@ from tqdm import tqdm
 
 from datapipes.utils.collation_functions import collate_sequences_as_dicts
 
-def infer_mesh(outputs, cam_ext):
+def get_mesh(dict, side, cam_ext, bs, t):
+    bs, t = dict[f'left_pose'].shape[:2]
+
+    mano = [dict[f'{side}_pose'], dict[f'{side}_shape'], dict[f'{side}_trans']]
+
+    mano[1] = mano[1].repeat(1, t, 1)
+    if mano[2].shape[1] == 1:
+        mano[2] = mano[2].repeat(1, t, 1)
+        mano[0] = mano[0].repeat(1, t, 1)
+
+    for i in range(len(mano)):
+        mano[i] = mano[i].view(bs * t, mano[i].shape[-1])
+
+    mesh, _ = model.decode_mano(mano[0], mano[1], mano[2], side, cam_ext)
+    mesh = mesh.view(bs, t, -1, 3)
+
+    return mesh
+
+def infer_mesh(outputs, cam_ext, targets=None):
     bs, t = outputs[f'left_pose'].shape[:2]
 
     for side in ['left', 'right']:
-        mano_pred = [outputs[f'{side}_pose'], outputs[f'{side}_shape'], outputs[f'{side}_trans']]
-
-        mano_pred[1] = mano_pred[1].repeat(1, t, 1)
-        if mano_pred[2].shape[1] == 1:
-            mano_pred[2] = mano_pred[2].repeat(1, t, 1)
-            mano_pred[0] = mano_pred[0].repeat(1, t, 1)
-
-        for i in range(len(mano_pred)):
-            mano_pred[i] = mano_pred[i].view(bs * t, mano_pred[i].shape[-1])
-
-        mesh_pred, _ = model.decode_mano(mano_pred[0], mano_pred[1], mano_pred[2], side, cam_ext)
-        mesh_pred = mesh_pred.view(bs, t, -1, 3)
+        mesh_pred = get_mesh(outputs, side, cam_ext, bs, t)
         outputs[f'{side}_mesh'] = mesh_pred
+        
+        mesh_gt = get_mesh(targets, side, cam_ext, bs, t) if f'{side}_pose' in targets.keys() else None
+        targets[f'{side}_mesh'] = mesh_gt
     
     mesh = torch.cat((outputs['left_mesh'], outputs['right_mesh']), dim=2)
+    mesh_gt = torch.cat((targets['left_mesh'], targets['right_mesh']), dim=2) if targets['left_mesh'] is not None else None
 
-    return mesh[0, target_idx].cpu().detach().numpy()
+    return mesh[0, target_idx].cpu().detach().numpy(), mesh_gt[0, target_idx].cpu().detach().numpy() if mesh_gt is not None else None
 
 np.set_printoptions(precision=2)
 
@@ -68,7 +79,7 @@ for i, (_, data_dict) in tqdm(enumerate(loader), total=count // args.batch_size)
         pose = torch.cat((outputs['left_pose3d'][0, target_idx], outputs['right_pose3d'][0, target_idx], \
                          outputs['top_kps3d'][0, target_idx], outputs['bottom_kps3d'][0, target_idx]),
                          dim=0).cpu().detach().numpy()
-        mesh = infer_mesh(outputs, data_dict['cam_ext'][0])
+        mesh, mesh_gt = infer_mesh(outputs, data_dict['cam_ext'][0], data_dict)
     else:    
         outputs = outputs[0]
         error = (mpjpe(outputs[0, target_idx, :21], data_dict['left_pose3d'][0, target_idx]) + \
@@ -78,14 +89,26 @@ for i, (_, data_dict) in tqdm(enumerate(loader), total=count // args.batch_size)
     if error < min_error:
         min_error = error
         print(f'New min error: {min_error}')
+        H, W = 2, 2
         fig = plt.figure(figsize=(20, 20))
         img = data_dict['rgb'][0][target_idx].cpu().numpy().transpose(1, 2, 0)
         img = np.ascontiguousarray(img * 255, np.uint8)
-        plot_pose2d(img, pose, data_dict['cam_int'][0][0].cpu().numpy(), (fig, 1, 3), 1, '2D Pose')
+        ax = fig.add_subplot(H, W, 1)
+        ax.imshow(img)
+
+        plot_pose2d(img, pose, data_dict['cam_int'][0][0].cpu().numpy(), (fig, H, W), 2, '2D Pose')
 
         # Plot 3D pose
-        plot_pose3d((fig, 1, 3), 2, pose, '3D pose', mode='pred')
+        plot_pose3d((fig, H, W), 3, pose, '3D pose', mode='pred')
 
-        plot_mesh3d(mesh, hand_faces, (fig, 1, 3), 3, '3D mesh')
-        plt.show()
+        plot_mesh3d(mesh, hand_faces, (fig, H, W), 4, '3D mesh')
+        save_mesh(mesh, hand_faces, data_dict['key'][0][target_idx], error)
+        if mesh_gt is not None: save_mesh(mesh_gt, hand_faces, data_dict['key'][0][target_idx])
+
+        seq_name = '_'.join(data_dict['key'][0][target_idx].split('/')[:-1])
+        frame_name = data_dict['key'][0][target_idx].split('/')[-1].split('.')[0]
+
+        plt.savefig(f'output/meshes/{seq_name}/{frame_name}.png')
+        plt.close()
+        # plt.show()
     # print(outputs[0].shape)

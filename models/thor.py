@@ -14,7 +14,7 @@ class THOR(nn.Module):
         self.device = device
 
         # self.graformer = PoseGraFormer(num_kps=num_kps, num_frames=num_frames, d_model=32)
-        
+        self.backbone_path = rcnn_path
         self.obj_rcnn = torchvision.models.detection.keypointrcnn_resnet50_fpn(num_keypoints=21, num_classes=24)
         if rcnn_path != '':
             self.obj_rcnn.load_state_dict(torch.load(rcnn_path))
@@ -41,6 +41,12 @@ class THOR(nn.Module):
         
         # output_dim = 10 * 2 + 11 # 10 MANO Shape, 11 Object Classes
         # self.output = nn.Linear(extra_features * num_frames, output_dim)
+
+    def reload_backbone(self):
+        if self.backbone_path != '': 
+            self.obj_rcnn.load_state_dict(torch.load(self.backbone_path))
+            # self.obj_rcnn.eval()
+
 
     def one_hot(self, label):
         one_hot = torch.zeros(24)#.to(self.device)

@@ -358,7 +358,7 @@ def calculate_loss(outputs, targets, target_idx=0):
         else:
             mano_gt = targets[f'{side}_pose'][:, target_idx], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans'][:, target_idx]#, targets[f'{side}_pose3d'][:, target_idx]
             mano_pred = outputs[f'{side}_pose'][:, 0], outputs[f'{side}_shape'][:, 0], outputs[f'{side}_trans'][:, 0]#, outputs[f'{side}_pose3d'][:, 0]
-            
+
         loss = sum(L1(mano_gt[i], mano_pred[i]) * hw for i in range(len(mano_gt)))
         losses[f'{side}_mano'] = loss
 
@@ -511,7 +511,7 @@ def load_weights(model, weights_path):
         checkpoint = torch.load(weights_path)
         model.load_state_dict(checkpoint)
         start_epoch = int(weights_path.split('/')[-1].split('_')[-1].split('.')[0]) + 1
-
+        model.reload_backbone()
     return model, start_epoch
 
 def get_keypoints(outputs, i):
