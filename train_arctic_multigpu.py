@@ -36,7 +36,7 @@ def main():
     dh = DistributedHelper()
     target_idx = args.window_size-1 if args.causal else args.window_size // 2
 
-    if not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
+    if dh.is_master and not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
     logger = create_logger(args.output_folder)
     logger.info(f'created logger at {args.output_folder}')
 
