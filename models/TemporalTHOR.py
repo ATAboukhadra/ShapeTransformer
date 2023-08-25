@@ -15,6 +15,7 @@ class TemporalTHOR(nn.Module):
         self.mano_layers = {'right': mano_layer_right, 'left': mano_layer_left}
 
         self.thor = THOR(device, input_dim=input_dim, num_frames=num_frames, num_kps=num_kps)
+        self.backbone_path = thor_path
         if thor_path != '': self.thor.load_state_dict(torch.load(thor_path))
         self.thor.eval()
 
