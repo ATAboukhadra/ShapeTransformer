@@ -38,7 +38,6 @@ def main():
 
     if dh.is_master and not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
     logger = create_logger(args.output_folder)
-    logger.info(f'created logger at {args.output_folder}')
 
     train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', args.mode, 'cpu', args.window_size, args.num_seqs)
     trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_sequences_as_dicts, drop_last=True)
@@ -59,7 +58,9 @@ def main():
     
     model = dh.wrap_model_for_ddp(model)
     num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    if dh.is_master: logger.info(f'total number of parameters: {num_params}')
+    if dh.is_master: 
+        logger.info(f'saving outputs to {args.output_folder}')
+        logger.info(f'total number of parameters: {num_params}')
 
     if args.run_val:
         with torch.no_grad():
