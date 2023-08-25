@@ -480,7 +480,7 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
     
     for i, (_, data_dict) in iterable_loader:
-        if i / total_samples > 0.75: break # Due to unbalanced dataloaders between GPUs
+        if dh is not None and i / total_samples > 0.75: break # Due to unbalanced dataloaders between GPUs
 
         if data_dict is None: continue
 

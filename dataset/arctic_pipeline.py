@@ -76,7 +76,8 @@ def create_pipe(in_dir, objects_root, subset, mode, device, sliding_window_size,
 
     # Using the metadata created in the conversion process, the streaming pipeline can be created automatically.
     arctic_decoder = ArcticDecoder(objects_root, device, mode) if arctic_decoder is None else arctic_decoder
-    pipe = factory.create_datapipe(subset, 1, max_concurrent_sequences=shuffle_buffer_size, shuffle_shards=True, temporal_sliding_window_size=sliding_window_size, add_component_fn=arctic_decoder if subset in ['train', 'val'] else None)
+    #, max_concurrent_sequences=shuffle_buffer_size
+    pipe = factory.create_datapipe(subset, num_seqs, shuffle_shards=True, temporal_sliding_window_size=sliding_window_size, add_component_fn=arctic_decoder if subset in ['train', 'val'] else None)
     # Decode the components of the dataset. Placing it in a function makes it reusable.
     pipe = decode_dataset(pipe)
     # pipe = factory.add_temporal_windowing_and_shuffling(pipe)
