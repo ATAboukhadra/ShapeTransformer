@@ -33,7 +33,7 @@ dataset = decoder.dataset
 hand_faces = dataset.hand_faces
 
 model = load_model(args, device, target_idx)
-start_epoch = 0
+start_epoch = 1
 if args.weights:
     logger.info(f'Loading model from {args.weights}')
     model, start_epoch = load_weights(model, args.weights)
