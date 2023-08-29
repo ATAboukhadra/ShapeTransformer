@@ -415,8 +415,8 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
             mano_gt[i] = mano_gt[i].view(bs * t, mano_gt[i].shape[-1])
             mano_pred[i] = mano_pred[i].view(bs * t, mano_pred[i].shape[-1])
 
-        mesh_gt, pose_gt = model.decode_mano(mano_gt[0], mano_gt[1], mano_gt[2] / 1000, side, cam_ext)
-        mesh_pred, pose_pred = model.decode_mano(mano_pred[0], mano_pred[1], mano_pred[2] / 1000, side, cam_ext)
+        mesh_gt, pose_gt = model.decode_mano(mano_gt[0], mano_gt[1], mano_gt[2], side, cam_ext)
+        mesh_pred, pose_pred = model.decode_mano(mano_pred[0], mano_pred[1], mano_pred[2], side, cam_ext)
         
         mesh_gt = mesh_gt.view(bs, t, -1, 3)
         mesh_pred = mesh_pred.view(bs, t, -1, 3)
@@ -453,8 +453,8 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
 
     for i in range(len(object_names)):
         cam_ext_i = cam_ext.view(bs, t, 4, 4)[i]
-        obj_verts_pred, _ = dataset.transform_obj(pred_object_names[i], obj_pred[0][i], obj_pred[1][i], obj_pred[2][i], cam_ext_i)
-        obj_verts_gt, _ = dataset.transform_obj(object_names[i], obj_gt[0][i], obj_gt[1][i], obj_gt[2][i], cam_ext_i)
+        obj_verts_pred, _ = dataset.transform_obj(pred_object_names[i], obj_pred[0][i], obj_pred[1][i], obj_pred[2][i] / 1000, cam_ext_i)
+        obj_verts_gt, _ = dataset.transform_obj(object_names[i], obj_gt[0][i], obj_gt[1][i], obj_gt[2][i] / 1000, cam_ext_i)
         for part in ['top', 'bottom']:
             if obj_verts_pred[part].shape[1] != obj_verts_gt[part].shape[1]:
                 # Calculate chamfer distance in case of wrong classification
