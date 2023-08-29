@@ -30,8 +30,9 @@ class THOR(nn.Module):
         #     hid_dim = 128
         #     # self.temporal_encoder = Transformer(num_frames, num_kps=num_kps, input_dim=num_features, hid_dim=hid_dim, num_layers=4, normalize_before=True)
         #     self.temporal_encoder = GraFormer(hid_dim=temporal_dim, coords_dim=(num_features, 3 * num_kps), num_pts=num_frames, temporal=True)
+        self.resize = transforms.Resize(64, antialias=True)
 
-        if self.input_dim > 2 + 24:
+        if self.input_dim > 2 + 24: # 538 features 
             weights = ResNet18_Weights.DEFAULT
             full_resnet18 = resnet18(weights=weights, progress=False)
             self.resnet18 = torch.nn.Sequential(*list(full_resnet18.children())[:-1])
@@ -57,7 +58,13 @@ class THOR(nn.Module):
     def patch_features(self, image, box):
         # Crop image around box
         cropped_image = image[:, int(box[1]):int(box[3]), int(box[0]):int(box[2])].unsqueeze(0)
-        features = self.resnet18(cropped_image).squeeze(-1).squeeze(-1).squeeze(0)
+
+        if cropped_image.shape[2] == 0 or cropped_image.shape[3] == 0:
+            features = torch.zeros(512).to(self.device)
+        else:
+            cropped_image = self.resize(cropped_image)
+            features = self.resnet18(cropped_image)[0, :, 0, 0]
+        
         return features
 
 
