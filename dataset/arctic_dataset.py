@@ -212,6 +212,7 @@ class ArcticDataset(Dataset):
 
         num_frames = obj_annotations.shape[0] - 1
         obj_pose = torch.tensor(obj_annotations[min(frame_num, num_frames)], device=self.device)
+        obj_pose[4:] /= 1000
         obj_dict['obj_pose'] = obj_pose
         obj_dict['object_name'] = obj
         obj_dict['label'] = torch.tensor(self.object_names.index(obj), dtype=torch.long, device=self.device)
