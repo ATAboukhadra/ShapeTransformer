@@ -400,7 +400,6 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
         return metrics
 
     # Calculate hand mesh error
-    print(targets['cam_ext'].shape)
     cam_ext = targets['cam_ext'].unsqueeze(1).view(bs * t, 4, 4)
 
     for side in ['left', 'right']:
