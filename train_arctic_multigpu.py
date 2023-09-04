@@ -122,7 +122,7 @@ def main():
         # t.terminate()
 
         if dh.is_master:
-            logger.info(f'Saving model at epoch {e+1}')
+            logger.info(f'Saving model at epoch {e}')
             torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
 
         errors = run_val(valloader, val_count, args.batch_size, dataset, target_idx, model, logger, e, dh.local_rank, dh)

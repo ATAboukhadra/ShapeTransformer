@@ -336,8 +336,8 @@ def calculate_pose_loss(outputs, targets, target_idx=0, mode='loss'):
     errors = [left_pose_loss * 1000, right_pose_loss * 1000]
 
     if outputs.shape[2] > 42:
-        top_pose_gt = targets['top_kps3d'][:, target_idx]
-        bottom_pose_gt = targets['bottom_kps3d'][:, target_idx]
+        top_pose_gt = targets['top_kps3d'][:, target_idx, :21]
+        bottom_pose_gt = targets['bottom_kps3d'][:, target_idx, :21]
         top_pose_loss = mpjpe(outputs[:, output_target_idx, 42:63], top_pose_gt)
         bottom_pose_loss = mpjpe(outputs[:, output_target_idx, 63:], bottom_pose_gt)
         pose_loss += top_pose_loss + bottom_pose_loss
@@ -463,7 +463,7 @@ def calculate_error(outputs, targets, dataset, target_idx, model):
                 obj_mesh_err = mpjpe(obj_verts_pred[part][target_idx], obj_verts_gt[part][target_idx]) * 1000
 
             metrics[f'{part[0]}m'] = metrics[f'{part}_mesh'] + obj_mesh_err if f'{part}_mesh' in metrics.keys() else obj_mesh_err
-            kps_err = mpjpe(outputs[f'{part}_kps3d'][i, target_idx], targets[f'{part}_kps3d'][i, target_idx]) * 1000
+            kps_err = mpjpe(outputs[f'{part}_kps3d'][i, target_idx], targets[f'{part}_kps3d'][i, target_idx, :21]) * 1000
             metrics[f'{part[0]}k'] = kps_err
 
     return metrics

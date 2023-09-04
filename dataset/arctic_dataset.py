@@ -217,8 +217,8 @@ class ArcticDataset(Dataset):
         obj_dict['object_name'] = obj
         obj_dict['label'] = torch.tensor(self.object_names.index(obj), dtype=torch.long, device=self.device)
         _, obj_kps = self.transform_obj(obj, obj_pose[0].unsqueeze(0), obj_pose[1:4].unsqueeze(0), obj_pose[4:].unsqueeze(0), cam_ext)
-        obj_dict['top_kps3d'] = obj_kps[0, 0, :self.num_kps_obj]
-        obj_dict['bottom_kps3d'] = obj_kps[1, 0, :self.num_kps_obj]
+        obj_dict['top_kps3d'] = obj_kps[0, 0] #, :self.num_kps_obj]
+        obj_dict['bottom_kps3d'] = obj_kps[1, 0] #, :self.num_kps_obj]
         obj_kps2d = project_3D_points(cam_int, obj_kps.view(2, -1, 3))
         top_bb = self.calculate_bounding_box(obj_kps2d[0])
         bottom_bb = self.calculate_bounding_box(obj_kps2d[1])
