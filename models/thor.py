@@ -48,7 +48,6 @@ class THOR(nn.Module):
             self.obj_rcnn.load_state_dict(torch.load(self.backbone_path))
             # self.obj_rcnn.eval()
 
-
     def one_hot(self, label):
         one_hot = torch.zeros(24)#.to(self.device)
         one_hot[label] = 1

@@ -18,8 +18,8 @@ class ShapeTHOR(nn.Module):
         self.thor = THOR(device, input_dim=input_dim, num_frames=num_frames, num_kps=num_kps)
         if thor_path != '': self.thor.load_state_dict(torch.load(thor_path))
         self.thor.eval()
-        # for param in self.thor.parameters():
-        #     param.requires_grad = False
+        for param in self.thor.parameters():
+            param.requires_grad = False
 
         self.target_idx = target_idx
         self.input_dim = input_dim
