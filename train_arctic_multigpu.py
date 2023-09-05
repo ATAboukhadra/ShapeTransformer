@@ -37,7 +37,7 @@ def main():
     target_idx = args.window_size-1 if args.causal else args.window_size // 2
 
     if dh.is_master and not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
-    if dh.is_master: logger = create_logger(args.output_folder)
+    logger = create_logger(args.output_folder) if dh.is_master else None
 
     train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', args.mode, 'cpu', args.window_size, args.num_seqs)
     trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_sequences_as_dicts, drop_last=True)
