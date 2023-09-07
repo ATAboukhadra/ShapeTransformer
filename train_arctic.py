@@ -38,11 +38,6 @@ if args.weights:
     logger.info(f'Loading model from {args.weights}')
     model, start_epoch = load_weights(model, args.weights)
 
-# model.eval()
-# for param in model.parameters():
-#     param.requires_grad = False
-
-
 num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 logger.info(f'total number of parameters: {num_params}')
 
