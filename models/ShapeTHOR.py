@@ -16,10 +16,12 @@ class ShapeTHOR(nn.Module):
 
         self.backbone_path = thor_path
         self.thor = THOR(device, input_dim=input_dim, num_frames=num_frames, num_kps=num_kps)
-        if thor_path != '': self.thor.load_state_dict(torch.load(thor_path))
-        self.thor.eval()
-        for param in self.thor.parameters():
-            param.requires_grad = False
+        if thor_path != '': 
+            self.thor.load_state_dict(torch.load(thor_path))
+            self.thor.eval()
+
+            if hasattr(self.thor, 'resnet18'):
+                self.thor.resnet18.train()
 
         self.target_idx = target_idx
         self.input_dim = input_dim
@@ -30,8 +32,12 @@ class ShapeTHOR(nn.Module):
     def reload_backbone(self):
         if self.backbone_path != '': 
             self.thor.load_state_dict(torch.load(self.backbone_path))
-            # self.thor.eval()
+            self.thor.eval()
 
+            if hasattr(self.thor, 'resnet18'):
+                self.thor.resnet18.train()
+        
+        
     def decode_mano(self, pose, shape, trans, side, cam_ext):
         verts_world, kps_world = self.mano_layers[side](pose, shape, trans)
         verts_world /= 1000
