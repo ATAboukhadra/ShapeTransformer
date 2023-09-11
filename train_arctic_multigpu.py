@@ -28,11 +28,11 @@ def main():
     logger = create_logger(args.output_folder) if dh.is_master else None
 
     train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, args.batch_size,  'train', args.mode, 'cpu', args.window_size, args.num_seqs)
-    train_pipeline = train_pipeline.fullsync()
+    # train_pipeline = train_pipeline.fullsync()
     trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=None, num_workers=args.num_workers, pin_memory=True)
 
     val_pipeline, val_count, _, _ = create_pipe(args.data_root, args.meta_root, args.batch_size, 'val', args.mode, 'cpu', args.window_size, args.num_seqs, factory=factory, arctic_decoder=decoder)
-    val_pipeline = val_pipeline.fullsync()
+    # val_pipeline = val_pipeline.fullsync()
     valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=None, num_workers=args.num_workers, pin_memory=True)
 
     dataset = decoder.dataset
@@ -70,7 +70,7 @@ def main():
         errors = {k: AverageMeter() for k in keys}
         loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
         # t = Terminate(f'{args.output_folder}/terminate_{e}.txt')
-        print(dist.is_available(), dist.is_initialized(), flush=True)
+        # print(dist.is_available(), dist.is_initialized(), flush=True)
         for i, (_, data_dict) in loader:
 
             if data_dict is None: continue
