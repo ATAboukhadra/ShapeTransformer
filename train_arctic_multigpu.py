@@ -15,18 +15,6 @@ from datapipes.utils.collation_functions import collate_sequences_as_dicts
 from torch import distributed as dist
 import os
 
-class Terminate():
-    def __init__(self, terminate_log_path):
-        self.terminate_log_path = terminate_log_path
-
-    def terminate(self):
-        with open(self.terminate_log_path, 'w') as f:
-            f.write('')
-
-    def isTerminated(self):
-        
-        return os.path.exists(self.terminate_log_path)
-
 def main():
 
     np.set_printoptions(precision=2)
@@ -40,12 +28,12 @@ def main():
     logger = create_logger(args.output_folder) if dh.is_master else None
 
     train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, args.batch_size,  'train', args.mode, 'cpu', args.window_size, args.num_seqs)
-    train_pipeline = train_pipeline.fullsync()
-    trainloader = torch.utils.data.DataLoader2(train_pipeline, batch_size=None, num_workers=args.num_workers)#, pin_memory=True)
+    # train_pipeline = train_pipeline.fullsync()
+    trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=None, num_workers=args.num_workers, pin_memory=True)
 
     val_pipeline, val_count, _, _ = create_pipe(args.data_root, args.meta_root, args.batch_size, 'val', args.mode, 'cpu', args.window_size, args.num_seqs, factory=factory, arctic_decoder=decoder)
-    val_pipeline = val_pipeline.fullsync()
-    valloader = torch.utils.data.DataLoader2(val_pipeline, batch_size=None, num_workers=args.num_workers)#, pin_memory=True)
+    # val_pipeline = val_pipeline.fullsync()
+    valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=None, num_workers=args.num_workers, pin_memory=True)
 
     dataset = decoder.dataset
     hand_faces = dataset.hand_faces
@@ -95,7 +83,7 @@ def main():
             outputs = model(data_dict)
             loss = calculate_loss(outputs, data_dict)
             
-            # if i / total_count > 0.75: break
+            if i / total_count > 0.75: break
             
             optimizer.zero_grad()
             loss.backward()
