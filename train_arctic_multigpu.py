@@ -41,11 +41,11 @@ def main():
 
     train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, args.batch_size,  'train', args.mode, 'cpu', args.window_size, args.num_seqs)
     train_pipeline = train_pipeline.fullsync()
-    trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=None, num_workers=args.num_workers, pin_memory=True)
+    trainloader = torch.utils.data.DataLoader2(train_pipeline, batch_size=None, num_workers=args.num_workers)#, pin_memory=True)
 
     val_pipeline, val_count, _, _ = create_pipe(args.data_root, args.meta_root, args.batch_size, 'val', args.mode, 'cpu', args.window_size, args.num_seqs, factory=factory, arctic_decoder=decoder)
     val_pipeline = val_pipeline.fullsync()
-    valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=None, num_workers=args.num_workers, pin_memory=True)
+    valloader = torch.utils.data.DataLoader2(val_pipeline, batch_size=None, num_workers=args.num_workers)#, pin_memory=True)
 
     dataset = decoder.dataset
     hand_faces = dataset.hand_faces
@@ -95,10 +95,7 @@ def main():
             outputs = model(data_dict)
             loss = calculate_loss(outputs, data_dict)
             
-            # if i / total_count > 0.75: 
-                # if t.isTerminated():
-                #     print('gpu', d    h.local_rank, flush=True)
-                # break
+            # if i / total_count > 0.75: break
             
             optimizer.zero_grad()
             loss.backward()
@@ -117,11 +114,6 @@ def main():
                 logger.info(f'\nEpoch {e} [{i+1} / {total_count}]: {error_list}')
                 errors = {k: AverageMeter() for k in keys}
                 torch.save(model.module.state_dict(), f'{args.output_folder}/model_{e}.pth')
-
-            # if dh.is_master: break
-
-        # print('terminate on gpu', dh.local_rank, flush=True)
-        # t.terminate()
 
         if dh.is_master:
             logger.info(f'Saving model at epoch {e}')
