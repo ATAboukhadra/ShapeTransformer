@@ -72,8 +72,10 @@ class THOR(nn.Module):
 
         # 2D Keypoints
         images = batch_dict['rgb']
+        # print()
         # Expand list of temporal batches to list of list of frames
         images = [img for temporal_batch in images for img in temporal_batch]
+        # print(len(images), images[0].shape)
         with torch.no_grad():
             rcnn_outputs = self.obj_rcnn(images)
 

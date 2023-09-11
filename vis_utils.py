@@ -468,8 +468,8 @@ def plot_mesh3d(mesh3d, faces, fig_config, subplot_id, plot_txt):
     ax.set_yticks([])
     ax.set_zticks([])
 
-    plot3dVisualize(ax, mesh3d[:778], faces['left'], flip_x=False, isOpenGLCoords=True, c="r")
-    plot3dVisualize(ax, mesh3d[778:778*2], faces['right'], flip_x=False, isOpenGLCoords=True, c="g")
+    plot3dVisualize(ax, mesh3d[:778], faces[:1538], flip_x=False, isOpenGLCoords=True, c="r")
+    plot3dVisualize(ax, mesh3d[778:778*2], faces[1538:1538*2] - 778, flip_x=False, isOpenGLCoords=True, c="g")
     coordChangeMat = np.array([[1., 0., 0.], [0, -1., 0.], [0., 0., -1.]], dtype=np.float32)
     cam_equal_aspect_3d(ax, mesh3d.dot(coordChangeMat.T), flip_x=False)
     
@@ -614,7 +614,7 @@ def save_mesh(mesh3d, faces, key, err=0):
         file_name += f'_{int(err)}'
         pred = True
     
-    faces = np.concatenate((faces['left'], faces['right'] + 778), axis = 0)
+    # faces = np.concatenate((faces['left'], faces['right'] + 778), axis = 0)
 
     write_obj(mesh3d, faces, file_name, pred)
 
@@ -629,10 +629,13 @@ def write_obj(verts, faces, filename, pred=True):
         texture[:778, 1] = 0.5
         texture[:778, 2] = 1
 
-        texture[778:, 0] = 0
-        texture[778:, 1] = 1
-        texture[778:, 2] = 0.5
+        texture[778:778*2, 0] = 0
+        texture[778:778*2, 1] = 1
+        texture[778:778*2, 2] = 0.5
 
+        texture[778*2:, 0] = 1
+        texture[778*2:, 1] = 0.5
+        texture[778*2:, 2] = 0
     else:
         texture[:, 0] = 0.7
         texture[:, 1] = 0.7

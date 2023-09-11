@@ -18,10 +18,10 @@ class ShapeTHOR(nn.Module):
         self.thor = THOR(device, input_dim=input_dim, num_frames=num_frames, num_kps=num_kps)
         if thor_path != '': 
             self.thor.load_state_dict(torch.load(thor_path))
-            self.thor.eval()
+            # self.thor.eval()
 
-            if hasattr(self.thor, 'resnet18'):
-                self.thor.resnet18.train()
+            # if hasattr(self.thor, 'resnet18'):
+                # self.thor.resnet18.train()
 
         self.target_idx = target_idx
         self.input_dim = input_dim
@@ -32,10 +32,10 @@ class ShapeTHOR(nn.Module):
     def reload_backbone(self):
         if self.backbone_path != '': 
             self.thor.load_state_dict(torch.load(self.backbone_path))
-            self.thor.eval()
+            # self.thor.eval()
 
-            if hasattr(self.thor, 'resnet18'):
-                self.thor.resnet18.train()
+            # if hasattr(self.thor, 'resnet18'):
+                # self.thor.resnet18.train()
         
         
     def decode_mano(self, pose, shape, trans, side, cam_ext):
@@ -47,8 +47,8 @@ class ShapeTHOR(nn.Module):
         return verts_cam, kps_cam
     
     def forward(self, batch_dict):
-        with torch.no_grad():
-            pose3d, graph, labels = self.thor(batch_dict)
+        # with torch.no_grad():
+        pose3d, graph, labels = self.thor(batch_dict)
 
         bs, t = len(batch_dict['rgb']), batch_dict['rgb'][0].shape[0]
         graph = graph.view(bs, t, 4 * 21, self.input_dim)[:, self.target_idx, :, 2:]
@@ -76,13 +76,6 @@ class ShapeTHOR(nn.Module):
             'obj_pose': obj_pose,
             'obj_class': labels
         }
-        # check for nan in left pose
-        if torch.isnan(outputs_dict['left_pose']).any():
-            print('left pose is nan')
-            # check if the inputs in batch_dict are tensors and if the contain nan
-            for k in batch_dict.keys():
-                if isinstance(batch_dict[k], torch.Tensor) and torch.isnan(batch_dict[k]).any():
-                    print(k, 'is nan')
         
         return outputs_dict
         

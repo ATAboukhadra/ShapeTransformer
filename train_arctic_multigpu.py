@@ -39,11 +39,13 @@ def main():
     if dh.is_master and not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
     logger = create_logger(args.output_folder) if dh.is_master else None
 
-    train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, 'train', args.mode, 'cpu', args.window_size, args.num_seqs)
-    trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_sequences_as_dicts, drop_last=True)
+    train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, args.batch_size,  'train', args.mode, 'cpu', args.window_size, args.num_seqs)
+    train_pipeline = train_pipeline.fullsync()
+    trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=None, num_workers=args.num_workers, pin_memory=True)
 
-    val_pipeline, val_count, _, _ = create_pipe(args.data_root, args.meta_root, 'val', args.mode, 'cpu', args.window_size, args.num_seqs, factory=factory, arctic_decoder=decoder)
-    valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_sequences_as_dicts, drop_last=True)
+    val_pipeline, val_count, _, _ = create_pipe(args.data_root, args.meta_root, args.batch_size, 'val', args.mode, 'cpu', args.window_size, args.num_seqs, factory=factory, arctic_decoder=decoder)
+    val_pipeline = val_pipeline.fullsync()
+    valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=None, num_workers=args.num_workers, pin_memory=True)
 
     dataset = decoder.dataset
     hand_faces = dataset.hand_faces
@@ -93,10 +95,10 @@ def main():
             outputs = model(data_dict)
             loss = calculate_loss(outputs, data_dict)
             
-            if i / total_count > 0.75: 
+            # if i / total_count > 0.75: 
                 # if t.isTerminated():
                 #     print('gpu', d    h.local_rank, flush=True)
-                break
+                # break
             
             optimizer.zero_grad()
             loss.backward()

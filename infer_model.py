@@ -44,6 +44,42 @@ def infer_mesh(outputs, cam_ext, targets=None):
 
     return mesh[0, target_idx].cpu().detach().numpy(), mesh_gt[0, target_idx].cpu().detach().numpy() if mesh_gt is not None else None
 
+def infer_object_mesh(outputs, cam_ext, faces, faces_gt, targets=None, mesh=None, mesh_gt=None):
+
+    bs, t = outputs[f'left_pose'].shape[:2]
+
+    obj_pose, obj_class = outputs['obj_pose'], outputs['obj_class']
+    if obj_pose.shape[1] == 1: obj_pose = obj_pose.repeat(1, t, 1)
+
+    pred_labels = torch.argmax(obj_class, dim=1)
+    obj_pred = obj_pose[:, :, :1], obj_pose[:, :, 1:4], obj_pose[:, :, 4:]
+    pred_object_names = [dataset.object_names[l] for l in pred_labels]
+    
+    obj_pose_gt = targets['obj_pose']
+    obj_gt = obj_pose_gt[:, :, :1], obj_pose_gt[:, :, 1:4], obj_pose_gt[:, :, 4:]
+    object_names = [dataset.object_names[l] for l in targets['label'][:, 0]]
+
+    i = 0
+    obj_verts_pred, _ = dataset.transform_obj(pred_object_names[i], obj_pred[0][i], obj_pred[1][i], obj_pred[2][i], cam_ext)
+    obj_verts_gt, _ = dataset.transform_obj(object_names[i], obj_gt[0][i], obj_gt[1][i], obj_gt[2][i], cam_ext)
+    offset, offset_gt = 778 * 2, 778 * 2
+    for part in ['top', 'bottom']:
+        obj_mesh = obj_verts_pred[part][target_idx].cpu().detach().numpy()
+        mesh = np.concatenate((mesh, obj_mesh), axis=0) if mesh is not None else obj_mesh
+        obj_faces = dataset.objects[pred_object_names[i]][part][1] + offset
+        faces = np.concatenate((faces, obj_faces), axis=0)
+        offset = mesh.shape[0]
+
+        obj_mesh_gt = obj_verts_gt[part][target_idx].cpu().detach().numpy()
+        mesh_gt = np.concatenate((mesh_gt, obj_mesh_gt), axis=0) if mesh_gt is not None else obj_mesh_gt
+        obj_faces = dataset.objects[object_names[i]][part][1] + offset_gt
+        faces_gt = np.concatenate((faces_gt, obj_faces), axis=0)
+        offset_gt = mesh_gt.shape[0]
+
+    return mesh, mesh_gt, faces, faces_gt
+
+
+
 np.set_printoptions(precision=2)
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -51,21 +87,23 @@ device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 args = parse_args()
 target_idx = args.window_size-1 if args.causal else args.window_size // 2
 
-pipeline, count, decoder, factory = create_pipe(args.data_root, args.meta_root, 'val', args.mode, 'cpu', args.window_size, args.num_seqs)
-loader = torch.utils.data.DataLoader(pipeline, batch_size=args.batch_size, num_workers=args.num_workers, pin_memory=True, collate_fn=collate_sequences_as_dicts)
+pipeline, count, decoder, factory = create_pipe(args.data_root, args.meta_root, args.batch_size, 'val', args.mode, 'cpu', args.window_size, args.num_seqs)
+loader = torch.utils.data.DataLoader(pipeline, batch_size=None, num_workers=args.num_workers, pin_memory=True)
+
 
 dataset = decoder.dataset
-hand_faces = dataset.hand_faces
-
+hand_faces = np.concatenate((dataset.hand_faces['left'], dataset.hand_faces['right'] + 778), axis=0)
 model = load_model(args, device, target_idx)
 model, start_epoch = load_weights(model, args.weights)
 
-min_error = 150
+min_error = 100
 
 for i, (_, data_dict) in tqdm(enumerate(loader), total=count // args.batch_size):
     if data_dict is None: continue
 
-    data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']] if isinstance(model, Stohrmer) else data_dict['rgb']
+    # data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']] if isinstance(model, Stohrmer) else data_dict['rgb']
+    # data_dict = {key: data_dict[key][0] for key in data_dict.keys()}
+
     for k in data_dict.keys():
         if isinstance(data_dict[k], torch.Tensor):
             data_dict[k] = data_dict[k].to(device)
@@ -75,18 +113,20 @@ for i, (_, data_dict) in tqdm(enumerate(loader), total=count // args.batch_size)
     # print(outputs[:, target_idx, :21].shape, data_dict['left_pose3d'][:, target_idx].shape)
     if isinstance(outputs, dict):
         errors = calculate_error(outputs, data_dict, dataset, target_idx, model)
-        error = (errors['lm'] + errors['rm']) / 2 
+        if errors['acc'] != 1: continue
+        error = (errors['lm'] + errors['rm'] + errors['tm'] + errors['bm']) / 4 
         pose = torch.cat((outputs['left_pose3d'][0, target_idx], outputs['right_pose3d'][0, target_idx], \
                          outputs['top_kps3d'][0, target_idx], outputs['bottom_kps3d'][0, target_idx]),
                          dim=0).cpu().detach().numpy()
         mesh, mesh_gt = infer_mesh(outputs, data_dict['cam_ext'][0], data_dict)
+        mesh, mesh_gt, faces, faces_gt = infer_object_mesh(outputs, data_dict['cam_ext'][0], np.copy(hand_faces), np.copy(hand_faces), data_dict, mesh, mesh_gt)
     else:    
         outputs = outputs[0]
         error = (mpjpe(outputs[0, target_idx, :21], data_dict['left_pose3d'][0, target_idx]) + \
              (mpjpe(outputs[0, target_idx, 21:42], data_dict['right_pose3d'][0, target_idx]))) * 500
         pose = outputs[0, target_idx].cpu().detach().numpy()
     
-    if error < min_error:
+    if error < 35:
         min_error = error
         print(f'New min error: {min_error}')
         H, W = 2, 2
@@ -101,13 +141,13 @@ for i, (_, data_dict) in tqdm(enumerate(loader), total=count // args.batch_size)
         # Plot 3D pose
         plot_pose3d((fig, H, W), 3, pose, '3D pose', mode='pred')
 
-        plot_mesh3d(mesh, hand_faces, (fig, H, W), 4, '3D mesh')
-        save_mesh(mesh, hand_faces, data_dict['key'][0][target_idx], error)
-        if mesh_gt is not None: save_mesh(mesh_gt, hand_faces, data_dict['key'][0][target_idx])
+        plot_mesh3d(mesh, faces, (fig, H, W), 4, '3D mesh')
+        save_mesh(mesh, faces, data_dict['key'][0][target_idx], error)
+        if mesh_gt is not None: save_mesh(mesh_gt, faces_gt, data_dict['key'][0][target_idx])
 
         seq_name = '_'.join(data_dict['key'][0][target_idx].split('/')[:-1])
         frame_name = data_dict['key'][0][target_idx].split('/')[-1].split('.')[0]
-
+        print('Exporting:', seq_name, frame_name)
         plt.savefig(f'output/meshes/{seq_name}/{frame_name}.png')
         plt.close()
         # plt.show()

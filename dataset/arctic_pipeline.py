@@ -18,6 +18,7 @@ from dataset.arctic_dataset import ArcticDataset
 import time 
 from torchvision.transforms.functional import resize
 from datapipes.utils.dataset_path_utils import get_component_name
+from datapipes.utils.collation_functions import collate_sequences_as_dicts
 
 class ArcticDecoder():
     def __init__(self, objects_root, device, mode='all'):
@@ -60,7 +61,7 @@ def decode_dataset(pipe: IterDataPipe):
 
     return pipe
 
-def create_pipe(in_dir, objects_root, subset, mode, device, sliding_window_size, num_seqs=4, factory=None, arctic_decoder=None):
+def create_pipe(in_dir, objects_root, batch_size, subset, mode, device, sliding_window_size, num_seqs=4, factory=None, arctic_decoder=None):
 
     # Make sure to create the factory only once. It reads the metadata file at construction time.
     if factory is None: factory = SequencePipelineCreator(in_dir)
@@ -82,6 +83,8 @@ def create_pipe(in_dir, objects_root, subset, mode, device, sliding_window_size,
     pipe = decode_dataset(pipe)
     # pipe = factory.add_temporal_windowing_and_shuffling(pipe)
     # pipe = pipe.map(fn=arctic_decoder)
+    pipe = pipe.batch(batch_size=batch_size, drop_last=True)
+    pipe = pipe.map(collate_sequences_as_dicts)
 
     # pipe.map(fn=batch_samples)
     return pipe, sample_count, arctic_decoder, factory

@@ -350,7 +350,7 @@ def calculate_loss(outputs, targets, target_idx=0):
         return calculate_pose_loss(outputs[0], targets, target_idx)
 
     losses = {}
-    hw = 0.01
+    # hw = 0.01
     for side in ['left', 'right']:
         if outputs[f'{side}_pose'].shape[1] > 1:
             mano_gt = targets[f'{side}_pose'], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans']#, targets[f'{side}_pose3d']
@@ -359,23 +359,25 @@ def calculate_loss(outputs, targets, target_idx=0):
             mano_gt = targets[f'{side}_pose'][:, target_idx], targets[f'{side}_shape'][:, 0], targets[f'{side}_trans'][:, target_idx]#, targets[f'{side}_pose3d'][:, target_idx]
             mano_pred = outputs[f'{side}_pose'][:, 0], outputs[f'{side}_shape'][:, 0], outputs[f'{side}_trans'][:, 0]#, outputs[f'{side}_pose3d'][:, 0]
 
-        loss = sum(L1(mano_gt[i], mano_pred[i]) * hw for i in range(len(mano_gt)))
+        loss = sum(L1(mano_gt[i], mano_pred[i]) for i in range(len(mano_gt)))
+        loss += mpjpe(outputs[f'{side}_pose3d'][:, 0], targets[f'{side}_pose3d'][:, target_idx])
         losses[f'{side}_mano'] = loss
 
     obj_pose_pred, obj_class = outputs['obj_pose'], outputs['obj_class']
     obj_pose_gt = targets['obj_pose']
 
-    ow = 0.1
-    loss = L1(obj_pose_gt, obj_pose_pred) * ow if obj_pose_pred.shape[1] > 1 else L1(obj_pose_gt[:, target_idx], obj_pose_pred[:, 0]) * ow
+    # ow = 0.1
+    loss = L1(obj_pose_gt, obj_pose_pred) if obj_pose_pred.shape[1] > 1 else L1(obj_pose_gt[:, target_idx], obj_pose_pred[:, 0])
     # if outputs['bottom_kps3d'].shape[1] > 1:
     #     top_pose_loss = mpjpe(outputs['top_kps3d'], targets['top_kps3d'])
     #     bottom_pose_loss = mpjpe(outputs['bottom_kps3d'], targets['bottom_kps3d'])
         
     # else:
-    #     top_pose_loss = mpjpe(outputs['top_kps3d'][:, 0], targets['top_kps3d'][:, target_idx])
-    #     bottom_pose_loss = mpjpe(outputs['bottom_kps3d'][:, 0], targets['bottom_kps3d'][:, target_idx])
 
-    # loss += top_pose_loss + bottom_pose_loss 
+    top_pose_loss = mpjpe(outputs['top_kps3d'][:, 0], targets['top_kps3d'][:, target_idx, :21])
+    bottom_pose_loss = mpjpe(outputs['bottom_kps3d'][:, 0], targets['bottom_kps3d'][:, target_idx, :21])
+
+    loss += top_pose_loss + bottom_pose_loss 
     losses['obj'] = loss
         
     total_loss = sum(loss for loss in losses.values())
@@ -480,7 +482,7 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
     
     for i, (_, data_dict) in iterable_loader:
-        if dh is not None and i / total_samples > 0.75: break # Due to unbalanced dataloaders between GPUs
+        # if dh is not None and i / total_samples > 0.75: break # Due to unbalanced dataloaders between GPUs
 
         if data_dict is None: continue
 

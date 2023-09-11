@@ -17,10 +17,10 @@ colors = {'right': 'blue', 'left': 'red', 'top': 'green', 'bottom': 'yellow'}
 
 root = '/ds-av/public_datasets/arctic/td/sequential_resized/'
 objects_root = 'dataset/arctic_objects'
-batch_size = 8
-num_workers = 8
+batch_size = 2
+num_workers = 4
 sliding_window_size = 3
-num_seqs = 16
+num_seqs = 2
 mode = 'all'
 
 train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', mode, 'cpu', sliding_window_size, num_seqs)
@@ -35,7 +35,7 @@ hand_faces = dataset.hand_faces
 
 for idx, (_, data_dict) in tqdm(enumerate(trainloader), total=num_samples // batch_size):
     articulation = data_dict['obj_pose'][0][0][0]
-    if idx < 200 or articulation < 0.1: # or data_dict['img'][0][0].shape[-2:][0] == 700:
+    if articulation < 0.1: # or data_dict['img'][0][0].shape[-2:][0] == 700:
         continue
     data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
     cam_int = data_dict['cam_int'][0][0]
