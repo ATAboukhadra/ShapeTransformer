@@ -1,0 +1,11 @@
+dataset/arctic_objects/*/*.json
+dataset/arctic_objects/*/mesh_tex.obj
+dataset/arctic_objects/*/mesh.obj
+nimble/assets/*.pkl
+*.pyc
+*/*.pyc
+*/*/*.pyc
+*.pth
+*.tflite
+*mano_v1_2*
+
