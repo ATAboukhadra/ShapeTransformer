@@ -70,7 +70,7 @@ def main():
         errors = {k: AverageMeter() for k in keys}
         loader = tqdm(enumerate(trainloader), total=total_count) if dh.is_master else enumerate(trainloader)
         # t = Terminate(f'{args.output_folder}/terminate_{e}.txt')
-
+        print(dist.is_available(), dist.is_initialized(), flush=True)
         for i, (_, data_dict) in loader:
 
             if data_dict is None: continue
