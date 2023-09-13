@@ -54,7 +54,7 @@ for e in range(start_epoch, args.epochs):
     for i, (_, data_dict) in tqdm(enumerate(trainloader), total=train_count // args.batch_size):
         if data_dict is None: continue
 
-        data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']] if isinstance(model, Stohrmer) else data_dict['rgb']
+        data_dict['rgb'] = [img_batch.to(device) for img_batch in data_dict['rgb']]
         for k in data_dict.keys():
             if isinstance(data_dict[k], torch.Tensor):
                 data_dict[k] = data_dict[k].to(device)
