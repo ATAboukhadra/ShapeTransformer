@@ -23,11 +23,11 @@ sliding_window_size = 3
 num_seqs = 2
 mode = 'all'
 
-train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', mode, 'cpu', sliding_window_size, num_seqs)
-trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=num_workers, collate_fn=collate_sequences_as_dicts)
+train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, batch_size, 'train', mode, 'cpu', sliding_window_size, num_seqs)
+trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=None, num_workers=num_workers)
 
-val_pipeline, _, _, _ = create_pipe(root, objects_root, 'val', mode, 'cpu', sliding_window_size, num_seqs, factory=factory, arctic_decoder=decoder)
-valloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=num_workers, collate_fn=collate_sequences_as_dicts)
+val_pipeline, _, _, _ = create_pipe(root, objects_root, batch_size, 'val', mode, 'cpu', sliding_window_size, num_seqs, factory=factory, arctic_decoder=decoder)
+valloader = torch.utils.data.DataLoader(train_pipeline, batch_size=None, num_workers=num_workers)
 
 # dataset = ArcticDataset(root, objects_root, device=device)
 dataset = decoder.dataset
@@ -50,12 +50,11 @@ for idx, (_, data_dict) in tqdm(enumerate(trainloader), total=num_samples // bat
     obj_pose = data_dict['obj_pose'][0]
     articulation = obj_pose[:, 0].unsqueeze(1)
     rot = obj_pose[:, 1:4]
-    trans = obj_pose[:, 4:] / 1000
+    trans = obj_pose[:, 4:] 
 
     object_name = data_dict['object_name'][0][0]
     cam_ext = data_dict['cam_ext'][0]
     obj_verts, obj_kps = dataset.transform_obj(object_name, articulation, rot, trans, cam_ext)
-
     obj_kps2d = data_dict['keypoints'][0].view(sliding_window_size, 4, -1, 3).cpu().numpy()
     
     for i in tqdm(range(data_dict['rgb'][0].shape[0])):

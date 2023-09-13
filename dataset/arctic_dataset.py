@@ -123,6 +123,7 @@ class ArcticDataset(Dataset):
         if camera > 0:
             cam_ext = torch.tensor(self.meta[subject]['world2cam'][camera-1], device=self.device).unsqueeze(0)
             cam_int = torch.tensor(self.meta[subject]['intris_mat'][camera-1], device=self.device)
+            valid=True
         else:
             num_frames = ego_annotations[f'R_k_cam_np'].shape[0]-1
             R = torch.tensor(ego_annotations[f'R_k_cam_np'][min(frame_num, num_frames)], device=self.device, dtype=torch.float32)
@@ -212,7 +213,7 @@ class ArcticDataset(Dataset):
 
         num_frames = obj_annotations.shape[0] - 1
         obj_pose = torch.tensor(obj_annotations[min(frame_num, num_frames)], device=self.device)
-        obj_pose[4:] /= 1000
+        obj_pose[4:] /= 1000 # Normalize translation for training purposes, will be multiplied by 1000 later in self.transform_points
         obj_dict['obj_pose'] = obj_pose
         obj_dict['object_name'] = obj
         obj_dict['label'] = torch.tensor(self.object_names.index(obj), dtype=torch.long, device=self.device)
@@ -289,6 +290,23 @@ class ArcticDataset(Dataset):
         box = torch.tensor([x_min, y_min, x_max, y_max], dtype=torch.float32)
         return box
 
+    def get_anno_test(self, key):
+        subject, seq_name, camera, frame = key.split('/')
+        camera_num = int(camera)
+        valid = True
+        if (self.mode == 'allocentric' and camera_num == 0) or (self.mode == 'egocentric' and camera_num != 0):
+            valid = False
+        
+        frame_num = int(frame.split('.')[0]) - 1
+        cam_ext, cam_int, valid = self.load_camera_matrix(subject, seq_name, camera_num, frame_num, valid)
+        data_dict = {
+            'cam_ext': cam_ext[0],
+            'cam_int': cam_int,
+            'valid': valid,
+            'key': key
+        }
+        return data_dict
+
     def get_anno(self, key):
         subject, seq_name, camera, frame = key.split('/')
         camera_num = int(camera)
@@ -306,7 +324,6 @@ class ArcticDataset(Dataset):
         hand_dict, hand_bbs, hand_keypoints, hand_labels, valid = self.load_hand_annotations(subject, seq_name, frame_num, cam_ext, cam_int, valid)
         obj_dict, obj_bbs, obj_keypoints, obj_labels, valid = self.load_obj_annotations(subject, seq_name, frame_num, cam_ext, cam_int, obj, valid)
 
-        
         hand_dict.update(obj_dict)
         data_dict = hand_dict
         

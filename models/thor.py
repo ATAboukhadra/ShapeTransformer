@@ -24,7 +24,6 @@ class THOR(nn.Module):
         self.input_dim = input_dim
         self.spatial_encoder = GraFormer(num_pts=num_kps, coords_dim=(self.input_dim, self.spatial_output))
 
-
         num_features = spatial_dim * num_kps
         # if num_frames > 1:
         #     hid_dim = 128

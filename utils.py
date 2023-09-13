@@ -51,6 +51,8 @@ def parse_args():
     ap.add_argument("--causal", action='store_true', help="Use only previous frames")     
     ap.add_argument("--weights", type=str, default='', help="path to pretrained weights")
     ap.add_argument("--backbone_path", type=str, default='', help="path to backbone network or subnetwork")
+    ap.add_argument("--split", type=str, default='val', help="train or val or test")
+    ap.add_argument("--visualize", action='store_true', help="visualize the output")
      
 
     return ap.parse_args()

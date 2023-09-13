@@ -25,12 +25,17 @@ class ArcticDecoder():
         self.dataset = ArcticDataset(objects_root, device, mode, iterable=True)
     
     def __call__(self, subset_id, seq_id, sample_id):
+
         splits = seq_id.split('_')
         subject = splits[0]
         seq_id = '_'.join(splits[1:-1])
         camera = splits[-1]
         key = '/'.join([subject, seq_id, camera, sample_id])
-        data_dict = self.dataset.get_anno(key)
+        
+        if subset_id == 'test': 
+            data_dict = self.dataset.get_anno_test(key)
+        else:
+            data_dict = self.dataset.get_anno(key)
 
         new_components = []
         for k, v in data_dict.items():
@@ -78,7 +83,7 @@ def create_pipe(in_dir, objects_root, batch_size, subset, mode, device, sliding_
     # Using the metadata created in the conversion process, the streaming pipeline can be created automatically.
     arctic_decoder = ArcticDecoder(objects_root, device, mode) if arctic_decoder is None else arctic_decoder
     #, max_concurrent_sequences=shuffle_buffer_size
-    pipe = factory.create_datapipe(subset, num_seqs, max_concurrent_sequences=num_seqs, shuffle_shards=True, temporal_sliding_window_size=sliding_window_size, add_component_fn=arctic_decoder if subset in ['train', 'val'] else None)
+    pipe = factory.create_datapipe(subset, num_seqs, max_concurrent_sequences=num_seqs, shuffle_shards=True, temporal_sliding_window_size=sliding_window_size, add_component_fn=arctic_decoder)
     # Decode the components of the dataset. Placing it in a function makes it reusable.
     pipe = decode_dataset(pipe)
     # pipe = factory.add_temporal_windowing_and_shuffling(pipe)

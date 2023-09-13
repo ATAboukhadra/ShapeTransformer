@@ -602,7 +602,7 @@ def project_3D_points(cam_mat, pts3D, is_OpenGL_coords=True):
 
     return proj_pts
 
-def save_mesh(mesh3d, faces, key, err=0):
+def save_mesh(mesh3d, faces, key, err=None):
     seq_name = '_'.join(key.split('/')[:-1])
     if not os.path.exists(f'output/meshes/{seq_name}'):
         os.makedirs(f'output/meshes/{seq_name}')
@@ -610,7 +610,7 @@ def save_mesh(mesh3d, faces, key, err=0):
     pred=False
     frame_name = key.split('/')[-1].split('.')[0]
     file_name = f'output/meshes/{seq_name}/{frame_name}'
-    if err > 0: 
+    if err is not None: 
         file_name += f'_{int(err)}'
         pred = True
     
