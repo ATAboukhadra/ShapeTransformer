@@ -132,7 +132,7 @@ def convert_to_directory(output_dict):
         
         for k in files.keys():
             subdir = 'meta_info' if 'meta' in k else 'preds'
-            t = torch.stack(files[k]) if 'meta' not in k else files[k]
+            t = torch.stack(files[k]).to(torch.float16) if 'meta' not in k else files[k]
             torch.save(t, f'{path}/{seq_id}/{subdir}/{k}.pt')
 
 
