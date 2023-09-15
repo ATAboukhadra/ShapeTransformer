@@ -20,14 +20,16 @@ else:
     
 objects_root = 'dataset/arctic_objects'
 backbone = 'resnet50'
+weights = '/checkpoints/keypointrcnn_resnet50_fpn_3.pth'
 output_folder = f'/checkpoints/{backbone}_{mode}/'
 if not os.path.exists(output_folder): os.mkdir(output_folder)
 
 batch_size = 8
 num_workers = 4
 sliding_window_size = 1
-epochs = 5
+epochs = 20
 num_kps = 21 
+start_epoch = 1 if weights != '' else int(weights.split('/')[-1].split('.')[0].split('_')[-1]) + 1
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 if backbone == 'resnet50':
@@ -35,7 +37,8 @@ if backbone == 'resnet50':
 elif backbone == 'resnet18':
     backbone = resnet_fpn_backbone(backbone_name='resnet18', weights=ResNet18_Weights.DEFAULT, trainable_layers=5)
     model = KeypointRCNN(backbone, num_classes=24, num_keypoints=num_kps).to(device)
-    
+
+model.load_state_dict(torch.load(weights))
 
 train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', mode, 'cpu', sliding_window_size)
 trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=num_workers, collate_fn=collate_sequences_as_dicts)
@@ -44,7 +47,7 @@ valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=batch_size, num
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
-for e in range(epochs):
+for e in range(start_epoch, epochs):
 
     losses_counters = {'loss_classifier': AverageMeter(), 'loss_box_reg': AverageMeter(), 'loss_keypoint': AverageMeter(), 'loss_objectness': AverageMeter(), 'loss_rpn_box_reg': AverageMeter()}
     for i, (_, data) in tqdm(enumerate(trainloader), total=num_samples // batch_size):
