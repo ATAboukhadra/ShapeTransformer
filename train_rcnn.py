@@ -9,7 +9,7 @@ from datapipes.utils.collation_functions import collate_sequences_as_dicts
 from torchvision.models import resnet18, ResNet18_Weights
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 
-root = '/ds-av/public_datasets/arctic/td/sequential_resized_allocentric/'
+root = '/ds-av/public_datasets/arctic/td/sequential_resized_egocentric/'
 
 if 'allocentric' in root:
     mode = 'allocentric'
@@ -20,8 +20,8 @@ else:
     
 objects_root = 'dataset/arctic_objects'
 backbone = 'resnet50'
-weights = '/checkpoints/arctic_rcnn_allocentric/keypointrcnn_resnet50_fpn_3.pth'
-output_folder = f'/checkpoints/{backbone}_{mode}/'
+weights = '/checkpoints/resnet50_egocentric/keypointrcnn_resnet50_fpn_4.pth'
+output_folder = f'/checkpoints/rcnn_{mode}/'
 if not os.path.exists(output_folder): os.mkdir(output_folder)
 
 batch_size = 16
@@ -67,11 +67,11 @@ for e in range(start_epoch, epochs):
 
         if (i+1) % 1000 == 0:
             print('\n', i+1 , [(k, round(losses_counters[k].avg, 2)) for k in losses.keys()], flush=True)
-            torch.save(model.state_dict(), f'{output_folder}rcnn_{backbone}_{e}.pth')
+            torch.save(model.state_dict(), f'{output_folder}{backbone}_{e}.pth')
             for k in losses.keys():
                 losses_counters[k].reset()
     
-    torch.save(model.state_dict(), f'{output_folder}rcnn_{backbone}_{e}.pth')
+    torch.save(model.state_dict(), f'{output_folder}{backbone}_{e}.pth')
 
     losses_counters = {'loss_classifier': AverageMeter(), 'loss_box_reg': AverageMeter(), 'loss_keypoint': AverageMeter(), 'loss_objectness': AverageMeter(), 'loss_rpn_box_reg': AverageMeter()}
     with torch.no_grad():
