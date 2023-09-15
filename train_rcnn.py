@@ -24,8 +24,8 @@ weights = '/checkpoints/arctic_rcnn_allocentric/keypointrcnn_resnet50_fpn_3.pth'
 output_folder = f'/checkpoints/{backbone}_{mode}/'
 if not os.path.exists(output_folder): os.mkdir(output_folder)
 
-batch_size = 8
-num_workers = 4
+batch_size = 16
+num_workers = 8
 sliding_window_size = 1
 epochs = 20
 num_kps = 21 
