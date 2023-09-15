@@ -29,7 +29,7 @@ num_workers = 4
 sliding_window_size = 1
 epochs = 20
 num_kps = 21 
-start_epoch = 1 if weights != '' else int(weights.split('/')[-1].split('.')[0].split('_')[-1]) + 1
+start_epoch = 1 if weights == '' else int(weights.split('/')[-1].split('.')[0].split('_')[-1]) + 1
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 if backbone == 'resnet50':
