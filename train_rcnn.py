@@ -9,7 +9,7 @@ from datapipes.utils.collation_functions import collate_sequences_as_dicts
 from torchvision.models import resnet18, ResNet18_Weights
 from torchvision.models.detection.backbone_utils import resnet_fpn_backbone
 
-root = '/ds-av/public_datasets/arctic/td/sequential_resized_egocentric/'
+root = '/ds-av/public_datasets/arctic/td/sequential_resized_allocentric/'
 
 if 'allocentric' in root:
     mode = 'allocentric'
@@ -19,16 +19,16 @@ else:
     mode = 'all'
     
 objects_root = 'dataset/arctic_objects'
-output_folder = f'/checkpoints/rcnn50_{mode}/'
+backbone = 'resnet50'
+output_folder = f'/checkpoints/{backbone}_{mode}/'
 if not os.path.exists(output_folder): os.mkdir(output_folder)
 
-batch_size = 1
+batch_size = 8
 num_workers = 4
 sliding_window_size = 1
 epochs = 5
 num_kps = 21 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-backbone = 'resnet50'
 
 if backbone == 'resnet50':
     model = keypointrcnn_resnet50_fpn(num_keypoints=num_kps, num_classes=24).to(device)
@@ -64,11 +64,11 @@ for e in range(epochs):
 
         if (i+1) % 1000 == 0:
             print(i+1, [(k, round(losses_counters[k].avg, 2)) for k in losses.keys()], flush=True)
-            torch.save(model.state_dict(), f'{output_folder}keypointrcnn_{backbone}_fpn_{e}.pth')
+            torch.save(model.state_dict(), f'{output_folder}rcnn_{backbone}_{e}.pth')
             for k in losses.keys():
                 losses_counters[k].reset()
     
-    torch.save(model.state_dict(), f'{output_folder}keypointrcnn_{backbone}_fpn_{e}.pth')
+    torch.save(model.state_dict(), f'{output_folder}rcnn_{backbone}_{e}.pth')
 
     losses_counters = {'loss_classifier': AverageMeter(), 'loss_box_reg': AverageMeter(), 'loss_keypoint': AverageMeter(), 'loss_objectness': AverageMeter(), 'loss_rpn_box_reg': AverageMeter()}
     with torch.no_grad():
