@@ -20,7 +20,7 @@ else:
     
 objects_root = 'dataset/arctic_objects'
 backbone = 'resnet50'
-weights = '/checkpoints/keypointrcnn_resnet50_fpn_3.pth'
+weights = '/checkpoints/arctic_rcnn_allocentric/keypointrcnn_resnet50_fpn_3.pth'
 output_folder = f'/checkpoints/{backbone}_{mode}/'
 if not os.path.exists(output_folder): os.mkdir(output_folder)
 
