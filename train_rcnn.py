@@ -40,10 +40,10 @@ elif backbone == 'resnet18':
 
 model.load_state_dict(torch.load(weights))
 
-train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, 'train', mode, 'cpu', sliding_window_size)
-trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=batch_size, num_workers=num_workers, collate_fn=collate_sequences_as_dicts)
-val_pipeline, val_count, _, _ = create_pipe(root, objects_root, 'val', mode, 'cpu', sliding_window_size, factory=factory, arctic_decoder=decoder)
-valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=batch_size, num_workers=num_workers, pin_memory=False, collate_fn=collate_sequences_as_dicts)
+train_pipeline, num_samples, decoder, factory = create_pipe(root, objects_root, batch_size, 'train', mode, 'cpu', sliding_window_size)
+trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=None, num_workers=num_workers)
+val_pipeline, val_count, _, _ = create_pipe(root, objects_root, batch_size, 'val', mode, 'cpu', sliding_window_size, factory=factory, arctic_decoder=decoder)
+valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=None, num_workers=num_workers)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
