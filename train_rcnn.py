@@ -66,7 +66,7 @@ for e in range(start_epoch, epochs):
             losses_counters[k].update(losses[k].item(), len(images))
 
         if (i+1) % 1000 == 0:
-            print(i+1, [(k, round(losses_counters[k].avg, 2)) for k in losses.keys()], flush=True)
+            print('\n', i+1 , [(k, round(losses_counters[k].avg, 2)) for k in losses.keys()], flush=True)
             torch.save(model.state_dict(), f'{output_folder}rcnn_{backbone}_{e}.pth')
             for k in losses.keys():
                 losses_counters[k].reset()
@@ -83,7 +83,7 @@ for e in range(start_epoch, epochs):
             for k in losses.keys():
                 losses_counters[k].update(losses[k].item(), len(images))
 
-        print('Validation', [(k, round(losses_counters[k].avg, 2)) for k in losses.keys()])
+        print('\nValidation', [(k, round(losses_counters[k].avg, 2)) for k in losses.keys()])
 
 
             
