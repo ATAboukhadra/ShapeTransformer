@@ -484,7 +484,8 @@ def run_val(valloader, val_count, batch_size, dataset, target_idx, model, logger
     iterable_loader = tqdm(enumerate(valloader), total=total_samples) if master_condition else enumerate(valloader)
     
     for i, (_, data_dict) in iterable_loader:
-        if dh is not None and i / total_samples > 0.75: break # Due to unbalanced dataloaders between GPUs
+        # if dh is not None and i / total_samples > 0.95: break # Due to unbalanced dataloaders between GPUs
+        # if dh is not None: break
 
         if data_dict is None: continue
 
@@ -515,7 +516,7 @@ def load_weights(model, weights_path):
         checkpoint = torch.load(weights_path)
         model.load_state_dict(checkpoint)
         start_epoch = int(weights_path.split('/')[-1].split('_')[-1].split('.')[0]) + 1
-        model.reload_backbone()
+        model.load_backbone()
     return model, start_epoch
 
 def get_keypoints(outputs, i):
