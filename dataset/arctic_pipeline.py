@@ -66,10 +66,10 @@ def decode_dataset(pipe: IterDataPipe):
 
     return pipe
 
-def create_pipe(in_dir, objects_root, batch_size, subset, mode, device, sliding_window_size, num_seqs=4, factory=None, arctic_decoder=None):
+def create_pipe(in_dir, objects_root, batch_size, subset, mode, device, sliding_window_size, num_seqs=4, num_workers=8, factory=None, arctic_decoder=None):
 
     # Make sure to create the factory only once. It reads the metadata file at construction time.
-    if factory is None: factory = SequencePipelineCreator(in_dir)
+    if factory is None: factory = SequencePipelineCreator(in_dir, metadata_filename='metadata_v2.json')
 
     # Make the shuffle buffer a multiple of the shard size. The multiplier may be chosen according to the batch size.
     # multiplier = 1
@@ -83,7 +83,8 @@ def create_pipe(in_dir, objects_root, batch_size, subset, mode, device, sliding_
     # Using the metadata created in the conversion process, the streaming pipeline can be created automatically.
     arctic_decoder = ArcticDecoder(objects_root, device, mode) if arctic_decoder is None else arctic_decoder
     #, max_concurrent_sequences=shuffle_buffer_size
-    pipe = factory.create_datapipe(subset, num_seqs, max_concurrent_sequences=num_seqs, shuffle_shards=True, temporal_sliding_window_size=sliding_window_size, add_component_fn=arctic_decoder)
+    pipe = factory.create_datapipe(subset, num_seqs, max_concurrent_sequences=num_seqs, shuffle_shards=True, temporal_sliding_window_size=sliding_window_size, 
+                                   add_component_fn=arctic_decoder, num_workers=num_workers)
     # Decode the components of the dataset. Placing it in a function makes it reusable.
     pipe = decode_dataset(pipe)
     # pipe = factory.add_temporal_windowing_and_shuffling(pipe)

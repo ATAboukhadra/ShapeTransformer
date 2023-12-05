@@ -27,11 +27,11 @@ def main():
     if dh.is_master and not os.path.exists(args.output_folder): os.mkdir(args.output_folder)
     logger = create_logger(args.output_folder) if dh.is_master else None
 
-    train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, args.batch_size,  'train', args.mode, 'cpu', args.window_size, args.num_seqs)
+    train_pipeline, train_count, decoder, factory = create_pipe(args.data_root, args.meta_root, args.batch_size,  'train', args.mode, 'cpu', args.window_size, args.num_seqs, args.num_workers)
     # train_pipeline = train_pipeline.fullsync()
     trainloader = torch.utils.data.DataLoader(train_pipeline, batch_size=None, num_workers=args.num_workers, pin_memory=True)
 
-    val_pipeline, val_count, _, _ = create_pipe(args.data_root, args.meta_root, args.batch_size, 'val', args.mode, 'cpu', args.window_size, args.num_seqs, factory=factory, arctic_decoder=decoder)
+    val_pipeline, val_count, _, _ = create_pipe(args.data_root, args.meta_root, args.batch_size, 'val', args.mode, 'cpu', args.window_size, args.num_seqs, args.num_workers, factory=factory, arctic_decoder=decoder)
     # val_pipeline = val_pipeline.fullsync()
     valloader = torch.utils.data.DataLoader(val_pipeline, batch_size=None, num_workers=args.num_workers, pin_memory=True)
 
@@ -83,7 +83,7 @@ def main():
             outputs = model(data_dict)
             loss = calculate_loss(outputs, data_dict)
             
-            if i / total_count > 0.75: break
+            # if i / total_count > 0.95: break
             
             optimizer.zero_grad()
             loss.backward()
